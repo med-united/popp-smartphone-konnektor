@@ -30,16 +30,20 @@ public class CardServicePortImpl implements CardServicePortType {
 	@Override
 	public SecureSendAPDUResponse secureSendAPDU(SecureSendAPDU parameter) throws FaultMessage {
 		LOG.log(Level.FINE, "Executing secureSendAPDU");
-		byte[] gzipBytes = new byte[0];
-		// Länge (2 Bytes) + GZIP-Daten zusammenführen
-		ByteBuffer buffer = ByteBuffer.allocate(2 + gzipBytes.length);
-		buffer.putShort((short) gzipBytes.length);
-		buffer.put(gzipBytes);
+		
+		// Find TLS Cert CN from security context
+		String tlsCertCN = identity.getPrincipal().getName();
+
+		String signedScenarioJwt = parameter.getSignedScenario();
+
+		String sessionId = "";
+		// Find session in card sessions
+		Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
+		if (session == null) {
+			throw new FaultMessage("No session found for card handle: " + sessionId);
+		}
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
-		SignedScenarioResponseType responseType = new SignedScenarioResponseType();
-		responseType.setResponseApduList(new SignedScenarioResponseType.ResponseApduList());
-		responseType.getResponseApduList().getResponseApdu().add(HexFormat.of().formatHex(buffer.array()));
-		response.setSignedScenarioResponse(responseType);
+
 		return response;
 	}
 
@@ -75,8 +79,6 @@ public class CardServicePortImpl implements CardServicePortType {
 		// Create and return a StartCardSessionResponse
 		StartCardSessionResponse response = new StartCardSessionResponse();
 		response.setSessionId(sessionId);
-		response.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
-		response.getStatus().setResult("OK");
 		return response;
 	}
 

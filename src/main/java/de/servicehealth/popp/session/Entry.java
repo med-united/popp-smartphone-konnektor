@@ -8,8 +8,6 @@ public class Entry {
     private CardInfoType cardInfoType;
     private Session session;
 
-    publ
-
     public Entry(String tlsCertCN, Session session) {
         this.tlsCertCN = tlsCertCN;
         this.session = session;
