@@ -36,6 +36,41 @@ public class CardServicePortImpl implements CardServicePortType {
 
 		String signedScenarioJwt = parameter.getSignedScenario();
 
+		/*
+		signedScenarioJwt contains a signed StandardScenarioMessage in JWT format.
+		The JWT consists of three parts: header, claims (payload), and signature.
+		The claims part contains the StandardScenarioMessage with details about the APDU commands to be executed.
+
+		"signedScenario": "eyAB.cdEF.ghIJ"
+		
+		Where:
+
+		Sample content of the signed `StandardScenarioMessage` (header, claims, signature):
+        ```json
+        {
+          "typ": "JWT"
+          "alg": "ES256"
+          "x5c": ["MII..."]
+          "stpl": "MII..."
+        }
+        .
+        {
+          "message": {
+            "type": "StandardScenario",
+            "version": "1.0.0",
+            "clientSessionId": "123e4567-e89b-12d3-a456-426614174000",
+            "sequenceCounter": 1,
+            "timeSpan": 1000,
+            "steps": [
+              {
+                "commandApdu": "00a4040c",
+                "expectedStatusWords": ["9000", "6f00"]
+              }
+            ]
+          }
+        }
+		*/
+
 		String sessionId = "";
 		// Find session in card sessions
 		Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
