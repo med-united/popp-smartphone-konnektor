@@ -4,6 +4,7 @@
   <groupId>de.servicehealth</groupId>
   <artifactId>popp-smartphone-konnektor</artifactId>
   <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
   <properties>
     <compiler-plugin.version>3.13.0</compiler-plugin.version>
     <maven.compiler.release>21</maven.compiler.release>
@@ -13,9 +14,15 @@
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
     <quarkus.platform.version>3.30.6</quarkus.platform.version>
     <version.jjwt>0.12.6</version.jjwt>
+    <cxf-version>4.1.4</cxf-version>
     <skipITs>true</skipITs>
     <surefire-plugin.version>3.3.1</surefire-plugin.version>
   </properties>
+  <modules>
+    <module>ehcl-api</module>
+    <module>popp-api</module>
+    <module>server</module>
+  </modules>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -31,6 +38,13 @@
         <version>${quarkus.platform.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+          <groupId>jakarta.platform</groupId>
+          <artifactId>jakarta.jakartaee-bom</artifactId>
+          <version>10.0.0</version>
+          <type>pom</type>
+          <scope>import</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -52,30 +66,59 @@
       <version>${version.jjwt}</version>
       <scope>runtime</scope>
     </dependency>
-    <!-- Quarkus CXF for SOAP services -->
     <dependency>
-      <groupId>io.quarkiverse.cxf</groupId>
-      <artifactId>quarkus-cxf</artifactId>
+        <groupId>org.apache.cxf</groupId>
+        <artifactId>cxf-rt-rs-client</artifactId>
+        <version>${cxf-version}</version>
     </dependency>
-    <!-- Quarkus Core -->
     <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-arc</artifactId>
+        <groupId>org.apache.cxf</groupId>
+        <artifactId>cxf-rt-frontend-jaxrs</artifactId>
+        <version>${cxf-version}</version>
     </dependency>
-    <!-- Testing -->
     <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-container-image-jib</artifactId>
+        <groupId>org.apache.cxf</groupId>
+        <artifactId>cxf-rt-rs-service-description</artifactId>
+        <version>${cxf-version}</version>
     </dependency>
-    <!-- Quarkus WebSocket -->
+
     <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-websockets</artifactId>
+        <groupId>io.swagger</groupId>
+        <artifactId>swagger-jaxrs</artifactId>
+        <scope>compile</scope>
+        <version>1.6.16</version>
+        <exclusions>
+            <exclusion>
+                <groupId>javax.validation</groupId>
+                <artifactId>validation-api</artifactId>
+            </exclusion>
+            <exclusion>
+                <groupId>javax.ws.rs</groupId>
+                <artifactId>jsr311-api</artifactId>
+            </exclusion>
+        </exclusions>
     </dependency>
-    <!-- Quarkus Security -->
+
     <dependency>
-      <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-security</artifactId>
+        <groupId>jakarta.ws.rs</groupId>
+        <artifactId>jakarta.ws.rs-api</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>jakarta.annotation</groupId>
+        <artifactId>jakarta.annotation-api</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>jakarta.json.bind</groupId>
+        <artifactId>jakarta.json.bind-api</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>jakarta.interceptor</groupId>
+        <artifactId>jakarta.interceptor-api</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.eclipse</groupId>
+        <artifactId>yasson</artifactId>
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>
@@ -83,81 +126,4 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>${quarkus.platform.group-id}</groupId>
-        <artifactId>quarkus-maven-plugin</artifactId>
-        <version>${quarkus.platform.version}</version>
-        <extensions>true</extensions>
-        <executions>
-          <execution>
-            <goals>
-              <goal>build</goal>
-              <goal>generate-code</goal>
-              <goal>generate-code-tests</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>${compiler-plugin.version}</version>
-        <configuration>
-          <parameters>true</parameters>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${surefire-plugin.version}</version>
-        <configuration>
-          <systemPropertyVariables>
-            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-            <maven.home>${maven.home}</maven.home>
-          </systemPropertyVariables>
-        </configuration>
-      </plugin>
-      <plugin>
-          <groupId>org.openapitools</groupId>
-          <artifactId>openapi-generator-maven-plugin</artifactId>
-          <version>7.8.0</version>
-          <executions>
-              <execution>
-                  <goals>
-                      <goal>generate</goal>
-                  </goals>
-                  <phase>generate-sources</phase>
-                  <configuration>
-                      <inputSpec>${project.basedir}/src/main/resources/openapi/I_PoPP_Token_Generation.yaml
-                      </inputSpec>
-                      <generatorName>jaxrs-cxf-client</generatorName>
-                      <cleanupOutput>true</cleanupOutput>
-                      <output>target/generated-sources</output>
-                      <apiPackage>de.servicehealth.popp.api</apiPackage>
-                      <modelPackage>de.servicehealth.popp.model</modelPackage>
-                      <invokerPackage>de.servicehealth.popp.handler</invokerPackage>
-                      <configOptions>
-                          <sourceFolder>/</sourceFolder>
-                          <useJakartaEe>true</useJakartaEe>
-                      </configOptions>
-                  </configuration>
-              </execution>
-          </executions>
-      </plugin>
-    </plugins>
-  </build>
-  <profiles>
-    <profile>
-      <id>native</id>
-      <activation>
-        <property>
-          <name>native</name>
-        </property>
-      </activation>
-      <properties>
-        <skipITs>false</skipITs>
-        <quarkus.native.enabled>true</quarkus.native.enabled>
-      </properties>
-    </profile>
-  </profiles>
 </project>

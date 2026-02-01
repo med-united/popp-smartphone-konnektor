@@ -2,9 +2,12 @@
 
 ## Development
 
+Compiling and running on a dev machine:
+
 ```bash
-mvn clean compile
-mvn quarkus:dev
+./mvn-install.sh
+cd server
+./mvn-quarkus-dev.sh
 ```
 
 ## Testing in minikube
