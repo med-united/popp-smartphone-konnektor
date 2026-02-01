@@ -2,19 +2,32 @@ package de.gematik.ws.conn.cardservice.wsdl.v8_2;
 
 import de.gematik.ws.conn.cardservice.v8.*;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
+import de.servicehealth.cardlink.model.SendApduEnvelope;
+import de.servicehealth.cardlink.model.SendApduPayload;
+import de.servicehealth.cardlink.model.SendApduEnvelope.TypeEnum;
+import de.servicehealth.popp.model.ScenarioStep;
+import de.servicehealth.popp.model.StandardScenarioMessage;
 import de.servicehealth.popp.session.Store;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import jakarta.websocket.Session;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 @jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePortType", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
@@ -77,9 +90,42 @@ public class CardServicePortImpl implements CardServicePortType {
 		if (session == null) {
 			throw new FaultMessage("No session found for card handle: " + sessionId);
 		}
+
+		Jwt<?, ?> jwt = Jwts.parser().build().parse(signedScenarioJwt);
+		InputStream inputStream = new ByteArrayInputStream((byte[]) jwt.getPayload());
+		Jsonb jsonb = JsonbBuilder.create();
+		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, StandardScenarioMessage.class);
+
+		// Process APDU commands from standardScenarioMessage
+		for (ScenarioStep step : standardScenarioMessage.getSteps()) {
+			String commandApduHex = step.getCommandApdu();
+			// Here you would send the APDU command to the card and get the response
+			// For demonstration, we will just log the command
+			LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
+			sendCardlinkWebsocketMessage(commandApduHex, session);
+		}
+
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
 
 		return response;
+	}
+
+	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session) {
+		// Create SendApduEnvelope message
+		SendApduEnvelope envelope = new SendApduEnvelope();
+		envelope.setType(TypeEnum.SEND_APDU);
+		SendApduPayload sendApduPayload = new SendApduPayload();
+		sendApduPayload.setApdu(HexFormat.of().parseHex(apduCommandHex));
+		// TODO find session id
+		sendApduPayload.cardSessionId(null);
+		envelope.setPayload(sendApduPayload.toString().getBytes(Charset.defaultCharset()));
+
+		// Send the message over WebSocket
+		try {
+			session.getBasicRemote().sendText(envelope.toString());
+		} catch (IOException e) {
+			LOG.log(Level.SEVERE, "Failed to send APDU command over WebSocket", e);
+		}
 	}
 
 	@Override

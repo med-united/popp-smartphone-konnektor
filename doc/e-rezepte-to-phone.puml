@@ -1,0 +1,54 @@
+@startuml
+!theme plain
+
+participant "Smartphone" as phone
+participant "smart-phone-popp-\nkonnektor-server" as connector
+participant "ere-ps-app" as app
+participant "popp-sample-code-\npopp-client" as client
+participant "popp-service" as service
+participant "eGK" as egk
+participant "E-Rezept\nFachdienst" as fachdienst
+
+== Needs to be reviewed ==
+
+== Initialisierung & Registrierung ==
+phone -> connector: WebSocket Connect
+phone -> connector: registerEgkNachricht\n(cardSessionId)
+connector -> app: CETP CARD_INSERTED\n(cardSessionId as card handle)
+
+== VSD Lesen ==
+app -> connector: readVSD\n(cardSessionId)
+connector -> client: contact-connector\n(cardSessionId)
+
+== PoPP Authentifizierung ==
+client -> service: Zeta Auth
+client -> service: WebSocket öffnen
+service -> connector: SecureSendAPDU\n(SignedScenario)
+client -> connector: start message\n(client session id)
+
+== APDU Kommunikation ==
+connector -> phone: SendAPDU\n(ScenarioSteps übersetzt)
+phone -> egk: PACE Kanal aufbauen
+activate egk
+phone -> egk: APDU senden
+egk --> phone: APDU Antwort
+deactivate egk
+phone -> connector: APDU Antwort
+connector -> client: SecureSendAPDUResponse
+client -> service: ScenarioResponseMessage
+
+== Token Empfang ==
+service -> client: PoPP Token
+service -> connector: PoPP Token
+connector -> app: ReadVSD Antwort\n(PoPP Token im Feld PNW)
+
+== E-Rezepte abrufen ==
+app -> fachdienst: E-Rezepte abrufen\n(mit PoPP-Token)
+fachdienst --> app: E-Rezepte
+
+== E-Rezepte an Smartphone ==
+app -> connector: WebSocket Connect
+app -> connector: ERezepteFromAVS\n(E-Rezepte)
+connector -> phone: E-Rezepte
+
+@enduml

@@ -1,0 +1,23 @@
+Bitte erzeuge ein UML Sequenzdiagramm in plant uml, was folgendes macht:
+
+* Smartphone konnektiert zu einem Websocket vom smart-phone-popp-konnektor-server und sendet eine registerEgkNachricht mit cardSessionId
+* smart-phone-popp-konnektor-server sendet eine CETP CARD_INSERTED Nachricht an ere-ps-app mit cardSessionId als card handle
+* ere-ps-app sendet eine readVSD Nachricht an smart-phone-popp-konnektor-server mit card session id
+* smartphone-popp-konnektor-server sendet eine contact-connector an popp-sample-code-popp-client mit card session id
+* popp-sample-code-popp-client macht Zeta Auth mit popp-service
+* popp-sample-code-popp-client öffnet Websocket mit popp-service
+* popp-service sendet per SecureSendAPDU mit SignedScenario an smart-phone-popp-konnektor-server
+* popp-sample-code-popp-client sendet start message with client session id zu smartphone-popp-konnektor-server
+* smartphone-popp-konnektor-server übersetz ScenaioSteps in einzelne SendAPDU und sendet diese durch Websocket an Smartphone
+* Smartphone macht PACE Kanal mit eGK auf
+* Smartphone sendet APDU an eGK
+* Smartphone sendet Antwort an smartphone-popp-konnektor-server
+* smartphone-popp-konnektor-server sendet Antwort per SecureSendAPDUResponse an popp-sample-code-popp-client
+* popp-sample-code-popp-client sendet Antwort per ScenarioResponseMessage an popp-service
+* popp-service sendet PoPP Token an popp-sample-code-popp-client
+* popp-service sendet PoPP Token als Antwort zu smartphone-popp-konnektor-server
+* smartphone-popp-konnektor-server sendet PoPP Token im Feld PNW als ReadVSD Antwort an ere-ps-app
+* ere-ps-app nutzt PoPP-Token um bei E-Rezept Fachdienst E-Rezepte zu bekommen
+* ere-ps-app konnektiert per WebSocket zu smartphone-popp-konnektor-server
+* ere-ps-app sendet E-Rezepte als ERezepteFromAVS to smartphone-popp-konnektor-server
+* smartphone-popp-konnektor-server sendet E-Rezepte an Smartphone
