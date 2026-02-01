@@ -1,50 +1,50 @@
 @startuml
 !theme plain
 
+participant "eGK" as egk
 participant "Smartphone" as phone
 participant "smart-phone-popp-\nkonnektor-server" as connector
 participant "ere-ps-app" as app
 participant "popp-sample-code-\npopp-client" as client
 participant "popp-service" as service
-participant "eGK" as egk
 participant "E-Rezept\nFachdienst" as fachdienst
 
-== Needs to be reviewed ==
+== Generate session & card inserted ==
+phone -> phone: generate cardSessionId
+phone -> connector: WebSocket connect
+phone -> connector: 1 WebSocket TextFame: registerEGK\n(cardSessionId)
+connector -> app: 2 CETP CARD_INSERTED\n(cardSessionId as card handle)
 
-== Initialisierung & Registrierung ==
-phone -> connector: WebSocket Connect
-phone -> connector: registerEgkNachricht\n(cardSessionId)
-connector -> app: CETP CARD_INSERTED\n(cardSessionId as card handle)
-
-== VSD Lesen ==
-app -> connector: readVSD\n(cardSessionId)
-connector -> client: contact-connector\n(cardSessionId)
+== readVSD ==
+app -> connector: 3 SOAP readVSD\n(cardSessionId as card handle)
+connector -> client: 4 HTTP GET contact-connector\n(cardSessionId)
 
 == PoPP Authentifizierung ==
-client -> service: Zeta Auth
-client -> service: WebSocket öffnen
-service -> connector: SecureSendAPDU\n(SignedScenario)
-client -> connector: start message\n(client session id)
+client -> service: Zeta Auth (Details not shown)
+client -> service: WebSocket connect (Details not shown)
+client -> service: start message\n(client session id)
 
-== APDU Kommunikation ==
+== APDU Communication ==
+service -> client: SignedScenario with StandardScenarioMessage including APDU steps
+client -> connector: SecureSendAPDU\n(SignedScenario)
 connector -> phone: SendAPDU\n(ScenarioSteps übersetzt)
-phone -> egk: PACE Kanal aufbauen
+phone -> egk: Open PACE channel
 activate egk
-phone -> egk: APDU senden
-egk --> phone: APDU Antwort
+phone -> egk: sendAPDU
+egk --> phone: respond APDU
 deactivate egk
-phone -> connector: APDU Antwort
+phone -> connector: sendAPDUResponse
 connector -> client: SecureSendAPDUResponse
 client -> service: ScenarioResponseMessage
 
-== Token Empfang ==
+== PoPP-Token Exchange ==
 service -> client: PoPP Token
-service -> connector: PoPP Token
-connector -> app: ReadVSD Antwort\n(PoPP Token im Feld PNW)
+client -> connector: PoPP Token
+connector -> app: ReadVSD Antwort\n(PoPP Token in field Pruefnachweis)
 
 == E-Rezepte abrufen ==
-app -> fachdienst: E-Rezepte abrufen\n(mit PoPP-Token)
-fachdienst --> app: E-Rezepte
+app -> fachdienst: get E-Rezepte\n(with PoPP-Token)
+fachdienst --> app: FHIR Bundle E-Rezepte
 
 == E-Rezepte an Smartphone ==
 app -> connector: WebSocket Connect
