@@ -9,7 +9,6 @@ import de.servicehealth.popp.model.ScenarioStep;
 import de.servicehealth.popp.model.StandardScenarioMessage;
 import de.servicehealth.popp.session.Store;
 import io.jsonwebtoken.Jwt;
-import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
@@ -18,17 +17,12 @@ import jakarta.json.bind.JsonbBuilder;
 import jakarta.websocket.Session;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
-import java.util.zip.GZIPOutputStream;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 @jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePortType", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
 public class CardServicePortImpl implements CardServicePortType {
@@ -83,18 +77,17 @@ public class CardServicePortImpl implements CardServicePortType {
           }
         }
 		*/
-
-		String sessionId = "";
+		
+		Jwt<?, ?> jwt = Jwts.parser().build().parse(signedScenarioJwt);
+		InputStream inputStream = new ByteArrayInputStream((byte[]) jwt.getPayload());
+		Jsonb jsonb = JsonbBuilder.create();
+		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, StandardScenarioMessage.class);
+		String sessionId = standardScenarioMessage.getClientSessionId();
 		// Find session in card sessions
 		Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
 		if (session == null) {
 			throw new FaultMessage("No session found for card handle: " + sessionId);
 		}
-
-		Jwt<?, ?> jwt = Jwts.parser().build().parse(signedScenarioJwt);
-		InputStream inputStream = new ByteArrayInputStream((byte[]) jwt.getPayload());
-		Jsonb jsonb = JsonbBuilder.create();
-		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, StandardScenarioMessage.class);
 
 		// Process APDU commands from standardScenarioMessage
 		for (ScenarioStep step : standardScenarioMessage.getSteps()) {
@@ -102,7 +95,7 @@ public class CardServicePortImpl implements CardServicePortType {
 			// Here you would send the APDU command to the card and get the response
 			// For demonstration, we will just log the command
 			LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
-			sendCardlinkWebsocketMessage(commandApduHex, session);
+			sendCardlinkWebsocketMessage(commandApduHex, session, sessionId);
 		}
 
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
@@ -110,14 +103,13 @@ public class CardServicePortImpl implements CardServicePortType {
 		return response;
 	}
 
-	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session) {
+	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session, String cardSessionId) {
 		// Create SendApduEnvelope message
 		SendApduEnvelope envelope = new SendApduEnvelope();
 		envelope.setType(TypeEnum.SEND_APDU);
 		SendApduPayload sendApduPayload = new SendApduPayload();
 		sendApduPayload.setApdu(HexFormat.of().parseHex(apduCommandHex));
-		// TODO find session id
-		sendApduPayload.cardSessionId(null);
+		sendApduPayload.cardSessionId(cardSessionId);
 		envelope.setPayload(sendApduPayload.toString().getBytes(Charset.defaultCharset()));
 
 		// Send the message over WebSocket

@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import de.servicehealth.cardlink.model.RegisterEgkPayload;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.websocket.Session;
 
@@ -53,5 +56,20 @@ public class Store {
             .findFirst()
             .map(Entry::getSession)
             .orElse(null);
+    }
+
+    public void registerEGK(String tlsCertCN, Session session, RegisterEgkPayload egkPayload, String cardSessionId) {
+        Optional<Entry> optionalSession = this.tlsCertCNs2cards.get(tlsCertCN).stream()
+            .filter(entry -> entry.getSession().equals(session))
+            .findFirst();
+        if (!optionalSession.isPresent()) {
+            // Log warning: session not found
+            Log.warn("Session not found.");
+            return;
+        } else {
+            Entry entry = optionalSession.get();
+            entry.setCardSessionId(cardSessionId);
+            entry.setRegisterEgkPayload(egkPayload);
+        }
     }
 }

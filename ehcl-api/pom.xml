@@ -140,7 +140,7 @@
                 </replacement>
             </replacements>
         </configuration>
-    </plugin>
+      </plugin>
     </plugins>
   </build>
 </project>

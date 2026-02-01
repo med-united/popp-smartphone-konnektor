@@ -5,9 +5,20 @@
 
 package de.gematik.ws.conn.eventservice.wsdl.v7_2;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
+import de.gematik.ws.conn.connectorcommon.v5.Status;
 import de.gematik.ws.conn.eventservice.v7.GetCardsResponse;
+import de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse;
+import de.gematik.ws.conn.eventservice.v7.SubscribeResponse;
+import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
+import de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse;
 import de.servicehealth.popp.session.Store;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
@@ -40,23 +51,42 @@ public class EventServicePortImpl implements EventServicePortType {
     @Inject
     Store store;
 
+    Map<String, List<SubscriptionType>> tlsCertCN2subscriptions = new ConcurrentHashMap<>();
+
     private static final Logger LOG = Logger.getLogger(EventServicePortImpl.class.getName());
 
     /* (non-Javadoc)
      * @see de.gematik.ws.conn.eventservice.wsdl.v7_2.EventServicePortType#subscribe(de.gematik.ws.conn.eventservice.v7.Subscribe parameter)*
      */
     public de.gematik.ws.conn.eventservice.v7.SubscribeResponse subscribe(de.gematik.ws.conn.eventservice.v7.Subscribe parameter) throws FaultMessage   {
-        LOG.info("Executing operation subscribe");
-        System.out.println(parameter);
-        LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
+        
         try {
-            de.gematik.ws.conn.eventservice.v7.SubscribeResponse _return = null;
+            LOG.info("Executing operation subscribe");
+            
+            List<SubscriptionType> subscriptions = getSubscriptions();
+            parameter.getSubscription().setSubscriptionID(UUID.randomUUID().toString());
+            subscriptions.add(parameter.getSubscription());
+            de.gematik.ws.conn.eventservice.v7.SubscribeResponse _return = new SubscribeResponse();
+            _return.setStatus(new Status());
+            _return.getStatus().setResult("OK");
+            _return.setSubscriptionID(parameter.getSubscription().getSubscriptionID());
             return _return;
         } catch (java.lang.Exception ex) {
             ex.printStackTrace();
-            throw new RuntimeException(ex);
+            throw new FaultMessage("FaultMessage...", ex);
         }
-        //throw new FaultMessage("FaultMessage...");
+    }
+
+    private List<SubscriptionType> getSubscriptions() {
+        String tlsCertCN = identity.getPrincipal().getName();
+        LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
+   
+        List<SubscriptionType> subscriptions = tlsCertCN2subscriptions.get(tlsCertCN);
+        if (subscriptions == null) {
+            subscriptions = new CopyOnWriteArrayList<>();
+            tlsCertCN2subscriptions.put(tlsCertCN, subscriptions);
+        }
+        return subscriptions;
     }
 
     /* (non-Javadoc)
@@ -71,7 +101,7 @@ public class EventServicePortImpl implements EventServicePortType {
             return _return;
         } catch (java.lang.Exception ex) {
             ex.printStackTrace();
-            throw new RuntimeException(ex);
+            throw new FaultMessage("FaultMessage...", ex);
         }
         //throw new FaultMessage("FaultMessage...");
     }
@@ -81,13 +111,20 @@ public class EventServicePortImpl implements EventServicePortType {
      */
     public de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse getSubscription(de.gematik.ws.conn.eventservice.v7.GetSubscription parameter) throws FaultMessage   {
         LOG.info("Executing operation getSubscription");
-        System.out.println(parameter);
         try {
-            de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse _return = null;
+            de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse _return = new GetSubscriptionResponse();
+            Optional<SubscriptionType> subscription = getSubscriptions().stream().filter(sub -> sub.getSubscriptionID().equals(parameter.getSubscriptionID())).findFirst();
+            _return.setStatus(new Status());
+            if(subscription.isPresent()) {
+                _return.getSubscriptions().getSubscription().add(subscription.get());
+                _return.getStatus().setResult("OK");
+            } else {
+                _return.getStatus().setResult("NOT_FOUND");
+            }
             return _return;
         } catch (java.lang.Exception ex) {
             ex.printStackTrace();
-            throw new RuntimeException(ex);
+            throw new FaultMessage("FaultMessage...", ex);
         }
         //throw new FaultMessage("FaultMessage...");
     }
@@ -97,13 +134,13 @@ public class EventServicePortImpl implements EventServicePortType {
      */
     public de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse unsubscribe(de.gematik.ws.conn.eventservice.v7.Unsubscribe parameter) throws FaultMessage   {
         LOG.info("Executing operation unsubscribe");
-        System.out.println(parameter);
         try {
-            de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse _return = null;
+            getSubscriptions().removeIf(sub -> sub.getSubscriptionID().equals(parameter.getSubscriptionID()));
+            de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse _return = new UnsubscribeResponse();
             return _return;
         } catch (java.lang.Exception ex) {
             ex.printStackTrace();
-            throw new RuntimeException(ex);
+            throw new FaultMessage("FaultMessage...", ex);
         }
         //throw new FaultMessage("FaultMessage...");
     }

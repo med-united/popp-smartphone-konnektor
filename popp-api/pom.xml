@@ -91,8 +91,7 @@
                   </goals>
                   <phase>generate-sources</phase>
                   <configuration>
-                      <inputSpec>${project.basedir}/src/main/resources/openapi/I_PoPP_Token_Generation.yaml
-                      </inputSpec>
+                      <inputSpec>${project.basedir}/src/main/resources/openapi/I_PoPP_Token_Generation.yaml</inputSpec>
                       <generatorName>jaxrs-cxf-client</generatorName>
                       <cleanupOutput>true</cleanupOutput>
                       <output>target/generated-sources</output>
@@ -140,7 +139,7 @@
                 </replacement>
             </replacements>
         </configuration>
-    </plugin>
+      </plugin>
     </plugins>
   </build>
 </project>
