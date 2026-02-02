@@ -24,7 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.nio.charset.Charset;
 
-@jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePortType", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
+@jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePort", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
 public class CardServicePortImpl implements CardServicePortType {
 	@Inject
 	Store store;

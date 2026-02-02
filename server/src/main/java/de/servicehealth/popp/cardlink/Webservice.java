@@ -36,6 +36,9 @@ public class Webservice {
         LOG.info("WebSocket opened for tlsCertCN: " + tlsCertCN);
         // Add session to store
         store.addEntry(new Entry(tlsCertCN, webSocketSession));
+
+        // send pin to websocket client
+        webSocketSession.getAsyncRemote().sendText("123456");
     }
 
     @OnMessage
