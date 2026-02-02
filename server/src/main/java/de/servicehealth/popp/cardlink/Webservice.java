@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import de.servicehealth.cardlink.model.RegisterEgkPayload;
 import de.servicehealth.popp.session.Entry;
 import de.servicehealth.popp.session.Store;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonArray;

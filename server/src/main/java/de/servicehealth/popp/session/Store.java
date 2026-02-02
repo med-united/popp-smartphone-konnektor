@@ -6,9 +6,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import de.gematik.ws.conn.cardservice.v8.CardInfoType;
 import de.servicehealth.cardlink.model.RegisterEgkPayload;
+import de.servicehealth.event.CardInserted;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
+import jakarta.inject.Inject;
 import jakarta.websocket.Session;
 
 
@@ -17,6 +21,9 @@ public class Store {
     private Map<String, List<Entry>> tlsCertCNs2cards = new HashMap<>();
     private List<String> tlsCertCNs = new ArrayList<>();
     private Map<String, Session> cardSessions = new HashMap<>();
+
+    @Inject
+    Event<CardInserted> cardInsertedEvent;
 
     public Map<String, List<Entry>> getTlsCertCNs2cards() {
         return tlsCertCNs2cards;
@@ -70,6 +77,9 @@ public class Store {
             Entry entry = optionalSession.get();
             entry.setCardSessionId(cardSessionId);
             entry.setRegisterEgkPayload(egkPayload);
+            if(cardInsertedEvent != null) {
+                cardInsertedEvent.fire(new CardInserted(tlsCertCN, entry.getCardInfoType()));
+            }
         }
     }
 }

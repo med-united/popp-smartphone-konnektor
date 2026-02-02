@@ -40,7 +40,10 @@ public class Entry {
 
     public void setRegisterEgkPayload(RegisterEgkPayload registerEgkPayload) {
         this.registerEgkPayload = registerEgkPayload;
+        cardInserted(registerEgkPayload);
+    }
 
+    public void cardInserted(RegisterEgkPayload registerEgkPayload) {
         // Parse X509 certificate from payload if available
         if (registerEgkPayload != null && registerEgkPayload.getX509AuthECC() != null) {
             try {
@@ -57,7 +60,6 @@ public class Entry {
         } else {
             this.x509AuthECC = null;
         }
-
     }
 
     void createCardTypeFromx509AuthECC(String cardSessionId2, X509Certificate x509AuthECC2) {
