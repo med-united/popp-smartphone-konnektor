@@ -23,7 +23,7 @@ import jakarta.xml.bind.annotation.XmlSeeAlso;
 @jakarta.jws.WebService(
                       serviceName = "VSDService",
                       portName = "VSDServicePort",
-                      targetNamespace = "http://ws.gematik.de/conn/VSDService/WSDL/v5.2",
+                      targetNamespace = "http://ws.gematik.de/conn/vsds/VSDService/v5.2",
                       wsdlLocation = "classpath:/wsdl/VSDService.wsdl",
                       endpointInterface = "de.gematik.ws.conn.vsds.vsdservice.v5_2.VSDServicePortType")
 
