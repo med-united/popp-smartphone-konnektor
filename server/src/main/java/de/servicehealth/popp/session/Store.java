@@ -58,7 +58,14 @@ public class Store {
     }
 
     public Session getSessionForCardHandle(String tlsCertCN, String cardHandle) {
-        return this.tlsCertCNs2cards.get(tlsCertCN).stream()
+        var list = this.tlsCertCNs2cards.get(tlsCertCN);
+
+        if(list == null) {
+            list = new CopyOnWriteArrayList<>();
+            this.tlsCertCNs2cards.put(tlsCertCN, list);
+        }
+        
+        return list.stream()
             .filter(entry -> entry.getCardInfoType().getCardHandle().equals(cardHandle))
             .findFirst()
             .map(Entry::getSession)
