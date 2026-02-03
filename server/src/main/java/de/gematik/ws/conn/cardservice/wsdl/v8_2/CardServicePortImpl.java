@@ -1,6 +1,6 @@
 package de.gematik.ws.conn.cardservice.wsdl.v8_2;
 
-import de.gematik.ws.conn.cardservice.v8.*;
+import de.gematik.ws.conn.cardservice.v8_2_1.*;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
 import de.servicehealth.cardlink.model.SendApduEnvelope;
 import de.servicehealth.cardlink.model.SendApduPayload;
