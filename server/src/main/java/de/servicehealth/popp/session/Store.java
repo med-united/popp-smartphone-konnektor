@@ -14,6 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.websocket.Session;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 
 @ApplicationScoped
