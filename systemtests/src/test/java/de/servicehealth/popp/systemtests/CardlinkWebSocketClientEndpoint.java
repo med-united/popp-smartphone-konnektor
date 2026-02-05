@@ -61,11 +61,6 @@ public class CardlinkWebSocketClientEndpoint {
             String requestSMSCode = buildMessage("requestSMSCode", "{\"senderId\": \"ws-sms\",\r\n        \"textTemplate\": \"" + textTemplate + "\",\r\n        \"phoneNumber\": \"\",\r\n        \"textReassignmentTemplate\": \"Ihre Gesundheitskarte {0} wurde der Telefonnummer {1} neu zugeordnet. Wenn Sie diese Telefonnummer kennen, ist alles in Ordnung. Wenn Ihre Karte gestohlen wurde, lassen Sie diese bitte von Ihrer Versicherung sperren.\"\r\n    }");
             log.info("Sending: {}", requestSMSCode);
             session.getBasicRemote().sendText(requestSMSCode);
-
-            System.out.println("Please enter SMS from phone");
-            smsCode = new String(System.in.readNBytes(6));
-
-            onMessage(smsCode);
         } catch (IOException e) {
             log.error("Sending requestSMSCode failed", e);
         }

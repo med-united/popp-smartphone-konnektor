@@ -121,9 +121,7 @@
             </execution>
         </executions>
         <configuration>
-            <basedir>
-                ${project.build.directory}/generated-sources
-            </basedir>
+            <basedir>${project.build.directory}/generated-sources</basedir>
             <includes>
                 <include>**/*.java</include>
             </includes>

@@ -2,6 +2,7 @@ package de.servicehealth.popp.cardlink;
 
 import java.io.ByteArrayInputStream;
 import java.util.Base64;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import de.servicehealth.cardlink.model.RegisterEgkPayload;
@@ -23,9 +24,9 @@ import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 
 @ServerEndpoint("/websocket/{tlsCertCN}")
-public class Webservice {
+public class Websocket {
 
-    private static final Logger LOG = Logger.getLogger(Webservice.class.getName());
+    private static final Logger LOG = Logger.getLogger(Websocket.class.getName());
 
     @Inject
     private Store store;
@@ -85,7 +86,7 @@ public class Webservice {
             }
             // webSocketSession.getBasicRemote().sendText("Echo from " + tlsCertCN + ": " + message);
         } catch (Exception e) {
-            LOG.severe("Error sending message: " + e.getMessage());
+            LOG.log(Level.SEVERE, "Error sending message: " + e.getMessage(), e);
         }
     }
 

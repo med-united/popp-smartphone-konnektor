@@ -6,6 +6,7 @@ import de.servicehealth.cardlink.model.SendApduEnvelope;
 import de.servicehealth.cardlink.model.SendApduPayload;
 import de.servicehealth.cardlink.model.SendApduEnvelope.TypeEnum;
 import de.servicehealth.popp.model.ScenarioStep;
+import de.servicehealth.popp.model.SignedScenarioClaims;
 import de.servicehealth.popp.model.StandardScenarioMessage;
 import de.servicehealth.popp.session.Store;
 import io.jsonwebtoken.Jwt;
@@ -80,8 +81,7 @@ public class CardServicePortImpl implements CardServicePortType {
 		
 		Jwt<?, ?> jwt = Jwts.parser().build().parse(signedScenarioJwt);
 		InputStream inputStream = new ByteArrayInputStream((byte[]) jwt.getPayload());
-		Jsonb jsonb = JsonbBuilder.create();
-		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, StandardScenarioMessage.class);
+		StandardScenarioMessage standardScenarioMessage = parseStandardScenarioMessage(inputStream);
 		String sessionId = standardScenarioMessage.getClientSessionId();
 		// Find session in card sessions
 		Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
@@ -101,6 +101,12 @@ public class CardServicePortImpl implements CardServicePortType {
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
 
 		return response;
+	}
+
+	StandardScenarioMessage parseStandardScenarioMessage(InputStream inputStream) {
+		Jsonb jsonb = JsonbBuilder.create();
+		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, SignedScenarioClaims.class).getMessage();
+		return standardScenarioMessage;
 	}
 
 	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session, String cardSessionId) {
