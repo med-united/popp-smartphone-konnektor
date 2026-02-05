@@ -9,8 +9,13 @@ import de.servicehealth.popp.model.ScenarioStep;
 import de.servicehealth.popp.model.SignedScenarioClaims;
 import de.servicehealth.popp.model.StandardScenarioMessage;
 import de.servicehealth.popp.session.Store;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.JweHeader;
+import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.Locator;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.json.bind.Jsonb;
@@ -24,6 +29,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.nio.charset.Charset;
+import java.security.Key;
 
 @jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePort", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
 public class CardServicePortImpl implements CardServicePortType {
@@ -78,11 +84,38 @@ public class CardServicePortImpl implements CardServicePortType {
           }
         }
 		*/
-		
-		Jwt<?, ?> jwt = Jwts.parser().build().parse(signedScenarioJwt);
-		InputStream inputStream = new ByteArrayInputStream((byte[]) jwt.getPayload());
-		StandardScenarioMessage standardScenarioMessage = parseStandardScenarioMessage(inputStream);
-		String sessionId = standardScenarioMessage.getClientSessionId();
+		LOG.info(signedScenarioJwt);
+		Jwt<?, ?> jwt = Jwts.parser().keyLocator(new Locator<Key>() {
+
+			@Override
+			public Key locate(Header header) {
+				return getKeyFromFirstEntry(header.get("x5c"));
+			}
+
+			private Key getKeyFromFirstEntry(Object object) {
+				if(object instanceof List) {
+					List<?> list = (List<?>) object;
+					if(list.size() > 0) {
+						Object firstEntry = list.get(0);
+						if(firstEntry instanceof String) {
+							String certBase64 = (String) firstEntry;
+							try {
+								InputStream is = new ByteArrayInputStream(Base64.getDecoder().decode(certBase64));
+								java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
+								java.security.cert.X509Certificate cert = (java.security.cert.X509Certificate) cf.generateCertificate(is);
+								return cert.getPublicKey();
+							} catch (Exception e) {
+								LOG.log(Level.SEVERE, "Failed to parse certificate from x5c", e);
+							}
+						}
+					}
+				}
+				return null;
+			}
+         
+         }).build().parse(signedScenarioJwt);
+		Map<String, Object> standardScenarioMessage = (Map<String, Object>) ((Claims) jwt.getPayload()).get("message");
+		String sessionId = (String) standardScenarioMessage.get("clientSessionId");
 		// Find session in card sessions
 		Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
 		if (session == null) {
@@ -90,8 +123,8 @@ public class CardServicePortImpl implements CardServicePortType {
 		}
 
 		// Process APDU commands from standardScenarioMessage
-		for (ScenarioStep step : standardScenarioMessage.getSteps()) {
-			String commandApduHex = step.getCommandApdu();
+		for (Map<String, Object> step : (List<Map<String, Object>>) standardScenarioMessage.get("steps")) {
+			String commandApduHex = (String) step.get("commandApdu");
 			// Here you would send the APDU command to the card and get the response
 			// For demonstration, we will just log the command
 			LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
@@ -101,12 +134,6 @@ public class CardServicePortImpl implements CardServicePortType {
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
 
 		return response;
-	}
-
-	StandardScenarioMessage parseStandardScenarioMessage(InputStream inputStream) {
-		Jsonb jsonb = JsonbBuilder.create();
-		StandardScenarioMessage standardScenarioMessage = jsonb.fromJson(inputStream, SignedScenarioClaims.class).getMessage();
-		return standardScenarioMessage;
 	}
 
 	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session, String cardSessionId) {
