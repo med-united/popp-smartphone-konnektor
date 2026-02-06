@@ -1,35 +1,48 @@
 package de.gematik.ws.conn.cardservice.wsdl.v8_2;
 
-import de.gematik.ws.conn.cardservice.v8_2_1.*;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.security.Key;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import de.gematik.ws.conn.cardservice.v8_2_1.ChangePin;
+import de.gematik.ws.conn.cardservice.v8_2_1.DisablePin;
+import de.gematik.ws.conn.cardservice.v8_2_1.EnablePin;
+import de.gematik.ws.conn.cardservice.v8_2_1.GetPinStatus;
+import de.gematik.ws.conn.cardservice.v8_2_1.GetPinStatusResponse;
+import de.gematik.ws.conn.cardservice.v8_2_1.SecureSendAPDU;
+import de.gematik.ws.conn.cardservice.v8_2_1.SecureSendAPDUResponse;
+import de.gematik.ws.conn.cardservice.v8_2_1.SignedScenarioResponseType;
+import de.gematik.ws.conn.cardservice.v8_2_1.StartCardSession;
+import de.gematik.ws.conn.cardservice.v8_2_1.StartCardSessionResponse;
+import de.gematik.ws.conn.cardservice.v8_2_1.StopCardSession;
+import de.gematik.ws.conn.cardservice.v8_2_1.StopCardSessionResponse;
+import de.gematik.ws.conn.cardservice.v8_2_1.UnblockPin;
+import de.gematik.ws.conn.cardservice.v8_2_1.VerifyPin;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
 import de.servicehealth.cardlink.model.SendApduEnvelope;
-import de.servicehealth.cardlink.model.SendApduPayload;
 import de.servicehealth.cardlink.model.SendApduEnvelope.TypeEnum;
-import de.servicehealth.popp.model.ScenarioStep;
-import de.servicehealth.popp.model.SignedScenarioClaims;
-import de.servicehealth.popp.model.StandardScenarioMessage;
+import de.servicehealth.cardlink.model.SendApduPayload;
 import de.servicehealth.popp.session.Store;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Header;
-import io.jsonwebtoken.JweHeader;
-import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Locator;
 import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
-import jakarta.json.bind.Jsonb;
-import jakarta.json.bind.JsonbBuilder;
 import jakarta.websocket.Session;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.nio.charset.Charset;
-import java.security.Key;
 
 @jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePort", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
 public class CardServicePortImpl implements CardServicePortType {
@@ -39,6 +52,9 @@ public class CardServicePortImpl implements CardServicePortType {
 	@Inject
     SecurityIdentity identity; // Inject the SecurityIdentity
 
+	@Inject
+	Event<SendApduPayloadWithSession> sendApduPayloadWithSessionEvent;
+
 	private static final Logger LOG = Logger.getLogger(CardServicePortImpl.class.getName());
 
 	@Override
@@ -46,7 +62,7 @@ public class CardServicePortImpl implements CardServicePortType {
 		LOG.log(Level.FINE, "Executing secureSendAPDU");
 		
 		// Find TLS Cert CN from security context
-		String tlsCertCN = identity.getPrincipal().getName();
+		String tlsCertCN = getTlsCertCN();
 
 		String signedScenarioJwt = parameter.getSignedScenario();
 
@@ -128,15 +144,28 @@ public class CardServicePortImpl implements CardServicePortType {
 			// Here you would send the APDU command to the card and get the response
 			// For demonstration, we will just log the command
 			LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
-			sendCardlinkWebsocketMessage(commandApduHex, session, sessionId);
+			sendCardlinkWebsocketMessage(tlsCertCN, commandApduHex, session, sessionId);
 		}
 
 		SecureSendAPDUResponse response = new SecureSendAPDUResponse();
+		response.setSignedScenarioResponse(new SignedScenarioResponseType());
+		response.getSignedScenarioResponse().setResponseApduList(new SignedScenarioResponseType.ResponseApduList());
+
+		List<CompletableFuture<String>> futureResponses = store.getAPDUResponses(tlsCertCN, sessionId);
+
+		for(var futureResponse : futureResponses) {
+			try {
+				response.getSignedScenarioResponse().getResponseApduList().getResponseApdu().add(futureResponse.get(10000, java.util.concurrent.TimeUnit.MILLISECONDS));
+			} catch (InterruptedException | ExecutionException | TimeoutException e) {
+				LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
+				throw new FaultMessage("Error getting APDU response: " + e.getMessage());
+			}
+		}
 
 		return response;
 	}
 
-	private void sendCardlinkWebsocketMessage(String apduCommandHex, Session session, String cardSessionId) {
+	private void sendCardlinkWebsocketMessage(String tlsCertCN, String apduCommandHex, Session session, String cardSessionId) {
 		// Create SendApduEnvelope message
 		SendApduEnvelope envelope = new SendApduEnvelope();
 		envelope.setType(TypeEnum.SEND_APDU);
@@ -146,11 +175,8 @@ public class CardServicePortImpl implements CardServicePortType {
 		envelope.setPayload(sendApduPayload.toString().getBytes(Charset.defaultCharset()));
 
 		// Send the message over WebSocket
-		try {
-			session.getBasicRemote().sendText(envelope.toString());
-		} catch (IOException e) {
-			LOG.log(Level.SEVERE, "Failed to send APDU command over WebSocket", e);
-		}
+		sendApduPayloadWithSessionEvent.fire(new SendApduPayloadWithSession(envelope, session, cardSessionId, tlsCertCN));
+
 	}
 
 	@Override
@@ -174,7 +200,7 @@ public class CardServicePortImpl implements CardServicePortType {
 		String sessionId = UUID.randomUUID().toString();
 		
 		// find TLS Cert CN from security context
-		String tlsCertCN = identity.getPrincipal().getName();
+		String tlsCertCN = getTlsCertCN();
 
 		// find existing entry in store
 		Session session = store.getSessionForCardHandle(tlsCertCN, parameter.getCardHandle());
@@ -184,7 +210,9 @@ public class CardServicePortImpl implements CardServicePortType {
 
 		// Create and return a StartCardSessionResponse
 		StartCardSessionResponse response = new StartCardSessionResponse();
-		response.setSessionId(sessionId);
+		// response.setSessionId(sessionId);
+
+		response.setSessionId("537e7eb7-82cd-4af0-90f2-3e514109f542");
 		return response;
 	}
 
@@ -212,4 +240,12 @@ public class CardServicePortImpl implements CardServicePortType {
 	public PinResponseType verifyPin(VerifyPin parameter) throws FaultMessage {
 		return null;
 	}
+
+    private String getTlsCertCN() {
+        String tlsCertCN = identity.getPrincipal().getName();
+        if ("".equals(tlsCertCN) || tlsCertCN == null) {
+            tlsCertCN = "null";
+        }
+        return tlsCertCN;
+    }
 }

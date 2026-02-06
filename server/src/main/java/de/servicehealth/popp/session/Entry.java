@@ -3,13 +3,16 @@ package de.servicehealth.popp.session;
 import java.io.ByteArrayInputStream;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.Calendar;
-
-import javax.xml.datatype.XMLGregorianCalendar;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import de.gematik.ws.conn.cardservice.v8.CardInfoType;
 import de.gematik.ws.conn.cardservicecommon.v2.CardTypeType;
-import de.servicehealth.cardlink.model.RegisterEgkPayload;
+import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
 
 public class Entry {
@@ -18,8 +21,9 @@ public class Entry {
     private String tlsCertCN;
     private CardInfoType cardInfoType;
     private Session session;
-    private RegisterEgkPayload registerEgkPayload;
+    private JsonObject registerEgkPayload;
     private java.security.cert.X509Certificate x509AuthECC;
+    private Map<String, CompletableFuture<String>> apduResponses = Collections.synchronizedMap(new LinkedHashMap<>());
 
     public Entry(String tlsCertCN, Session session) {
         this.tlsCertCN = tlsCertCN;
@@ -34,24 +38,25 @@ public class Entry {
         this.cardSessionId = cardSessionId;
     }
 
-    public RegisterEgkPayload getRegisterEgkPayload() {
+    public JsonObject getRegisterEgkPayload() {
         return registerEgkPayload;
     }
 
-    public void setRegisterEgkPayload(RegisterEgkPayload registerEgkPayload) {
+    public void setRegisterEgkPayload(JsonObject registerEgkPayload) {
         this.registerEgkPayload = registerEgkPayload;
         cardInserted(registerEgkPayload);
     }
 
-    public void cardInserted(RegisterEgkPayload registerEgkPayload) {
+    public void cardInserted(JsonObject registerEgkPayload) {
+        apduResponses = Collections.synchronizedMap(new LinkedHashMap<>());
         // Parse X509 certificate from payload if available
-        if (registerEgkPayload != null && registerEgkPayload.getX509AuthECC() != null) {
+        if (registerEgkPayload != null && registerEgkPayload.getString("x509AuthECC") != null) {
             try {
-                byte[] certBytes = registerEgkPayload.getX509AuthECC();
+                byte[] certBytes = Base64.getDecoder().decode(registerEgkPayload.getString("x509AuthECC"));
                 CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
                 ByteArrayInputStream bais = new ByteArrayInputStream(certBytes);
                 this.x509AuthECC = (java.security.cert.X509Certificate) cf.generateCertificate(bais);
-                createCardTypeFromx509AuthECC(registerEgkPayload.getCardSessionId(), this.x509AuthECC);
+                createCardTypeFromx509AuthECC(registerEgkPayload.getString("cardSessionId"), this.x509AuthECC);
             } catch (Exception e) {
                 this.x509AuthECC = null;
                 // Optionally log or handle the error
@@ -191,4 +196,13 @@ public class Entry {
     public void setSession(Session session) {
         this.session = session;
     }
+
+    public List<CompletableFuture<String>> getApduResponsesFuture() {
+        return apduResponses.values().stream().toList();
+    }
+
+    public Map<String, CompletableFuture<String>> getApduResponses() {
+        return this.apduResponses;
+    }
+
 }

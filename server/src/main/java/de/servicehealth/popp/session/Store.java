@@ -6,14 +6,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import de.gematik.ws.conn.cardservice.v8.CardInfoType;
-import de.servicehealth.cardlink.model.RegisterEgkPayload;
 import de.servicehealth.event.CardInserted;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
+import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
+
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 
@@ -50,6 +51,12 @@ public class Store {
         this.tlsCertCNs2cards.get(tlsCertCN).removeIf(entry -> entry.getSession().equals(session));
     }
 
+    public Optional<Entry> findEntry(String tlsCertCN, String cardSessionId) {
+        return this.tlsCertCNs2cards.get(tlsCertCN).stream()
+            .filter(entry -> entry.getCardSessionId() != null && entry.getCardSessionId().equals(cardSessionId))
+            .findFirst();
+    }
+
     public Map<String, Session> getCardSessions() {
         return cardSessions;
     }
@@ -73,7 +80,7 @@ public class Store {
             .orElse(null);
     }
 
-    public void registerEGK(String tlsCertCN, Session session, RegisterEgkPayload egkPayload, String cardSessionId) {
+    public void registerEGK(String tlsCertCN, Session session, JsonObject egkPayload, String cardSessionId) {
         Optional<Entry> optionalSession = this.tlsCertCNs2cards.get(tlsCertCN).stream()
             .filter(entry -> entry.getSession().equals(session))
             .findFirst();
@@ -88,6 +95,20 @@ public class Store {
             if(cardInsertedEvent != null) {
                 cardInsertedEvent.fire(new CardInserted(tlsCertCN, entry.getCardInfoType()));
             }
+        }
+    }
+
+    public List<CompletableFuture<String>> getAPDUResponses(String tlsCertCN, String cardSessionId) {
+        Optional<Entry> optionalSession = this.tlsCertCNs2cards.get(tlsCertCN).stream()
+            .filter(entry -> entry.getCardSessionId() != null && entry.getCardSessionId().equals(cardSessionId))
+            .findFirst();
+        if (!optionalSession.isPresent()) {
+            // Log warning: session not found
+            Log.warn("Session not found for APDU responses.");
+            return null;
+        } else {
+            Entry entry = optionalSession.get();
+            return entry.getApduResponsesFuture();
         }
     }
 }

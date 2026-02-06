@@ -2,7 +2,6 @@ package de.servicehealth.cetp;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 
 import de.gematik.ws.conn.cardservice.v8.CardInfoType;
 import de.gematik.ws.conn.eventservice.v7.Event;
@@ -11,11 +10,9 @@ import de.gematik.ws.conn.eventservice.v7.EventSeverityType;
 import de.gematik.ws.conn.eventservice.v7.EventType;
 import de.gematik.ws.conn.eventservice.wsdl.v7_2.Subscriptions;
 import de.servicehealth.event.CardInserted;
-import de.servicehealth.popp.session.Store;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.xml.bind.JAXB;
 import jakarta.xml.bind.JAXBContext;
 
 @ApplicationScoped

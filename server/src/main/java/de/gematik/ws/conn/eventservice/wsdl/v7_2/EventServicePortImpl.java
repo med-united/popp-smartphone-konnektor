@@ -17,6 +17,7 @@ import de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse;
 import de.gematik.ws.conn.eventservice.v7.SubscribeResponse;
 import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
 import de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse;
+import de.servicehealth.popp.session.Entry;
 import de.servicehealth.popp.session.Store;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
@@ -72,7 +73,7 @@ public class EventServicePortImpl implements EventServicePortType {
     }
 
     private List<SubscriptionType> getSubscriptions() {
-        String tlsCertCN = identity.getPrincipal().getName();
+        String tlsCertCN = getTlsCertCN();
         LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
    
         List<SubscriptionType> subscriptionTypes = subscriptions.getTlsCertCN2subscriptions().get(tlsCertCN);
@@ -178,14 +179,15 @@ public class EventServicePortImpl implements EventServicePortType {
         LOG.info("Executing operation getCards");
         System.out.println(parameter);
         try {
-            String tlsCertCN = identity.getPrincipal().getName();
+            String tlsCertCN = getTlsCertCN();
             LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
 
             
             de.gematik.ws.conn.eventservice.v7.GetCardsResponse _return = new GetCardsResponse();
             _return.setCards(new de.gematik.ws.conn.cardservice.v8.Cards());
             _return.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
-            _return.getCards().getCard().addAll(store.getTlsCertCNs2cards().get(tlsCertCN).stream().map(entry -> entry.getCardInfoType()).toList());
+            List<Entry> entries = store.getTlsCertCNs2cards().get(tlsCertCN);
+            _return.getCards().getCard().addAll(entries.stream().map(entry -> entry.getCardInfoType()).toList());
             _return.getStatus().setResult("OK");
             return _return;
         } catch (java.lang.Exception ex) {
@@ -193,6 +195,14 @@ public class EventServicePortImpl implements EventServicePortType {
             throw new RuntimeException(ex);
         }
         //throw new FaultMessage("FaultMessage...");
+    }
+
+    private String getTlsCertCN() {
+        String tlsCertCN = identity.getPrincipal().getName();
+        if ("".equals(tlsCertCN) || tlsCertCN == null) {
+            tlsCertCN = "null";
+        }
+        return tlsCertCN;
     }
 
 }

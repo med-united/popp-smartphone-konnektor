@@ -15,6 +15,12 @@
 
 	<dependencies>
 
+		<dependency>
+			<groupId>de.servicehealth</groupId>
+			<artifactId>popp-smartphone-konnektor-server</artifactId>
+			<version>1.0.0-SNAPSHOT</version>
+		</dependency>
+
 		<!-- Typrus WebSocket Client -->
 		<dependency>
 			<groupId>org.glassfish.tyrus</groupId>
@@ -87,8 +93,15 @@
 	</dependencies>
 
 	<build>
-		<plugins>
-
+		 <plugins>
+			<plugin>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-surefire-plugin</artifactId>
+			<version>3.5.4</version>
+			<configuration>
+				<useModulePath>false</useModulePath>
+			</configuration>
+			</plugin>
 		</plugins>
 	</build>
 </project>
