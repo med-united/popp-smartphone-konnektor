@@ -42,6 +42,8 @@ import io.jsonwebtoken.Locator;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import jakarta.websocket.Session;
 
 @jakarta.jws.WebService(serviceName = "CardService", portName = "CardServicePort", targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2", wsdlLocation = "classpath:/wsdl/CardService_v8_2_1.wsdl", endpointInterface = "de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType")
@@ -162,6 +164,8 @@ public class CardServicePortImpl implements CardServicePortType {
 			}
 		}
 
+		LOG.info("Collected all APDUs sending answer for session: "+sessionId);
+
 		return response;
 	}
 
@@ -170,9 +174,9 @@ public class CardServicePortImpl implements CardServicePortType {
 		SendApduEnvelope envelope = new SendApduEnvelope();
 		envelope.setType(TypeEnum.SEND_APDU);
 		SendApduPayload sendApduPayload = new SendApduPayload();
-		sendApduPayload.setApdu(HexFormat.of().parseHex(apduCommandHex));
+		sendApduPayload.setApdu(Base64.getEncoder().encodeToString(HexFormat.of().parseHex(apduCommandHex)));
 		sendApduPayload.cardSessionId(cardSessionId);
-		envelope.setPayload(sendApduPayload.toString().getBytes(Charset.defaultCharset()));
+		envelope.setPayload( Base64.getEncoder().encodeToString(JsonbBuilder.create().toJson(sendApduPayload).getBytes()));
 
 		// Send the message over WebSocket
 		sendApduPayloadWithSessionEvent.fire(new SendApduPayloadWithSession(envelope, session, cardSessionId, tlsCertCN));

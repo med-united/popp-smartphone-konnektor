@@ -277,7 +277,6 @@ components:
             - sendAPDU
         payload:
           type: string
-          format: byte
           description: Base64 encoded SendApduPayload
 
     SendApduPayload:
@@ -292,7 +291,6 @@ components:
           description: Card session identifier
         apdu:
           type: string
-          format: byte
           description: APDU to be forwarded to the card
 
     SendApduResponseEnvelope:

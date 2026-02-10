@@ -137,7 +137,7 @@ public class Websocket {
                     JsonArray sendApduPayload = Json.createArrayBuilder()
                             .add(Json.createObjectBuilder()
                                     .add("type", "sendAPDU")
-                                    .add("payload", Base64.getEncoder().encodeToString(event.envelope.getPayload())))
+                                    .add("payload", event.envelope.getPayload()))
                             .add(event.cardSessionId)
                             .add(correlationId)
                             .build();
