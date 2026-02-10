@@ -38,6 +38,7 @@ import de.gematik.ws.conn.cardservice.wsdl.v8_2.CardService;
 import de.gematik.ws.conn.cardservice.wsdl.v8_2.CardServicePortType;
 import de.gematik.ws.conn.eventservice.v7.GetCards;
 import de.gematik.ws.conn.eventservice.v7.GetCardsResponse;
+import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
 import de.gematik.ws.conn.eventservice.wsdl.v7_2.EventService;
 import de.gematik.ws.conn.eventservice.wsdl.v7_2.EventServicePortType;
 import de.gematik.ws.conn.eventservice.wsdl.v7_2.FaultMessage;
@@ -63,6 +64,15 @@ public class WebsocketTest<T> {
 				Thread.sleep(100);
 
 				EventServicePortType eventServicePortType = create(() -> new EventService().getEventServicePort(),"https://localhost:8443/services/EventService/v7.2");
+
+				var subscribeParameter = new de.gematik.ws.conn.eventservice.v7.Subscribe();
+				subscribeParameter.setSubscription(new SubscriptionType());
+				subscribeParameter.getSubscription().setEventTo("localhost:8888");
+
+				
+				
+				eventServicePortType.subscribe(subscribeParameter);
+
 				GetCards parameter = new GetCards();
 				eventServicePortType.getCards(parameter).getCards().getCard().forEach(cardTypeType -> {
 					System.out.println("Found card: " + cardTypeType.getCardHandle());
