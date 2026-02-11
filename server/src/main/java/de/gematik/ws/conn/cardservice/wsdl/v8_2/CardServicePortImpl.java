@@ -57,6 +57,9 @@ public class CardServicePortImpl implements CardServicePortType {
 	@Inject
 	Event<SendApduPayloadWithSession> sendApduPayloadWithSessionEvent;
 
+	@Inject
+	Event<NewAPDUForSession> newAPDUForSessionEvent;
+
 	private static final Logger LOG = Logger.getLogger(CardServicePortImpl.class.getName());
 
 	@Override
@@ -140,6 +143,7 @@ public class CardServicePortImpl implements CardServicePortType {
 			throw new FaultMessage("No session found for card handle: " + sessionId);
 		}
 
+		newAPDUForSessionEvent.fire(new NewAPDUForSession(session, sessionId, tlsCertCN));
 		// Process APDU commands from standardScenarioMessage
 		for (Map<String, Object> step : (List<Map<String, Object>>) standardScenarioMessage.get("steps")) {
 			String commandApduHex = (String) step.get("commandApdu");

@@ -34,9 +34,9 @@ import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
 
 @ClientEndpoint
-public class CardlinkWebSocketClientEndpoint {
+public class CardlinkPhoneWebSocketClientEndpoint {
 
-    private static final Logger log = LoggerFactory.getLogger(CardlinkWebSocketClientEndpoint.class);
+    private static final Logger log = LoggerFactory.getLogger(CardlinkPhoneWebSocketClientEndpoint.class);
     String cardSessionId = UUID.randomUUID().toString();
     String smsCode;
     private String correlationId;
@@ -44,7 +44,7 @@ public class CardlinkWebSocketClientEndpoint {
     final CountDownLatch closed = new CountDownLatch(1);
 
 
-    public CardlinkWebSocketClientEndpoint() {
+    public CardlinkPhoneWebSocketClientEndpoint() {
     }
 
 

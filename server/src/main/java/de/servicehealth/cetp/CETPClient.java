@@ -2,6 +2,8 @@ package de.servicehealth.cetp;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 
 import de.gematik.ws.conn.cardservice.v8.CardInfoType;
 import de.gematik.ws.conn.eventservice.v7.Event;
@@ -16,16 +18,16 @@ import jakarta.inject.Inject;
 import jakarta.xml.bind.JAXBContext;
 
 @ApplicationScoped
-public class CETPSender {
+public class CETPClient {
 
-    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(CETPSender.class.getName());
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(CETPClient.class.getName());
 
     @Inject
     Subscriptions subscriptions;
 
     JAXBContext jaxbContext;
 
-    public CETPSender() {
+    public CETPClient() {
         try {
             jaxbContext = JAXBContext.newInstance(Event.class);
         } catch (Exception e) {
@@ -113,11 +115,12 @@ public class CETPSender {
                 message.getParameter().add(createParameter("InsertTime", cardInfoType.getInsertTime().toString()));
                 message.getParameter().add(createParameter("CardHolderName", cardInfoType.getCardHolderName()));
                 message.getParameter().add(createParameter("CertExpirationDate", null));
-                message.getParameter().add(createParameter("CardVersion", cardInfoType.getCardVersion().toString()));
+                message.getParameter().add(createParameter("CardVersion", null));
                 message.getParameter().add(createParameter("KVNR", cardInfoType.getKvnr()));
                 event.setMessage(message);
                 
                 try {
+
                     // build tls socket to send event to subscription endpoint
                     String eventTo = subscription.getEventTo();
                     URI uri = new URI(eventTo);
@@ -128,10 +131,21 @@ public class CETPSender {
                     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                     jaxbContext.createMarshaller().marshal(event, outputStream);
                     byte[] eventBytes = outputStream.toByteArray();
-                    LOG.fine("Marshalled event: " + new String(eventBytes));
+                    LOG.info("Marshalled event: " + new String(eventBytes));
+
+                    // Create SSL context that ignores certificates and hostnames
+                    javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
+                        new javax.net.ssl.X509TrustManager() {
+                            public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+                            public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                            public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                        }
+                    };
+                    javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+                    sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+                    javax.net.ssl.SSLSocketFactory factory = sslContext.getSocketFactory();
 
                     // Send eventBytes over SSL socket with length prefix
-                    javax.net.ssl.SSLSocketFactory factory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
                     try (javax.net.ssl.SSLSocket socket = (javax.net.ssl.SSLSocket) factory.createSocket(host, port);
                          java.io.OutputStream out = socket.getOutputStream()) {
                         out.write(new byte[] {'C', 'E', 'T', 'P'}); // CETP magic bytes
@@ -151,7 +165,7 @@ public class CETPSender {
                         LOG.severe("Failed to send eventBytes: " + e.getMessage());
                     }
 
-                } catch (jakarta.xml.bind.JAXBException | URISyntaxException e) {
+                } catch (jakarta.xml.bind.JAXBException | URISyntaxException | NoSuchAlgorithmException | KeyManagementException e) {
                     LOG.severe("Failed to marshal event: " + e.getMessage());
                 }
 

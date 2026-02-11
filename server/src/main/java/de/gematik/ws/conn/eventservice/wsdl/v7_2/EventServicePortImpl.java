@@ -19,6 +19,7 @@ import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
 import de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse;
 import de.servicehealth.popp.session.Entry;
 import de.servicehealth.popp.session.Store;
+import io.quarkus.logging.Log;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 
@@ -59,8 +60,15 @@ public class EventServicePortImpl implements EventServicePortType {
             LOG.info("Executing operation subscribe");
             
             List<SubscriptionType> subscriptions = getSubscriptions();
-            parameter.getSubscription().setSubscriptionID(UUID.randomUUID().toString());
-            subscriptions.add(parameter.getSubscription());
+            if(!subscriptions.stream().anyMatch(sub -> 
+                (sub.getEventTo() == null || sub.getEventTo().equals(parameter.getSubscription().getEventTo())) &&
+                (sub.getTopic() == null || sub.getTopic().equals(parameter.getSubscription().getTopic())) &&
+                (sub.getFilter() == null || sub.getFilter().equals(parameter.getSubscription().getFilter()))
+            )) {
+                Log.warn("subscription does already exist. Not added.");
+                parameter.getSubscription().setSubscriptionID(UUID.randomUUID().toString());
+                subscriptions.add(parameter.getSubscription());
+            }
             de.gematik.ws.conn.eventservice.v7.SubscribeResponse _return = new SubscribeResponse();
             _return.setStatus(new Status());
             _return.getStatus().setResult("OK");
@@ -187,7 +195,9 @@ public class EventServicePortImpl implements EventServicePortType {
             _return.setCards(new de.gematik.ws.conn.cardservice.v8.Cards());
             _return.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
             List<Entry> entries = store.getTlsCertCNs2cards().get(tlsCertCN);
-            _return.getCards().getCard().addAll(entries.stream().map(entry -> entry.getCardInfoType()).toList());
+            if(entries != null) {
+                _return.getCards().getCard().addAll(entries.stream().map(entry -> entry.getCardInfoType()).toList());
+            }
             _return.getStatus().setResult("OK");
             return _return;
         } catch (java.lang.Exception ex) {

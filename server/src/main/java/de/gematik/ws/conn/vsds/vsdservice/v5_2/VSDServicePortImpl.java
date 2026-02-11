@@ -25,7 +25,7 @@ public class VSDServicePortImpl implements VSDServicePortType {
 
     private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(VSDServicePortImpl.class.getName());
 
-    @ConfigProperty(name = "popp.client-url", defaultValue = "http://localhost:8080")
+    @ConfigProperty(name = "popp.client-url", defaultValue = "http://localhost:8081")
     String poppClientUrl;
 
     @Override
@@ -39,8 +39,8 @@ public class VSDServicePortImpl implements VSDServicePortType {
         try {
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) uri.toURL().openConnection();
             conn.setRequestMethod("GET");
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
+            conn.setConnectTimeout(30000);
+            conn.setReadTimeout(30000);
             int responseCode = conn.getResponseCode();
             LOG.info("GET " + uri + " response code: " + responseCode);
             java.io.InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
