@@ -24,16 +24,17 @@ public class CetpServerHandler extends SimpleChannelInboundHandler<Event> {
                 var parameter = new de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD();
                 var contextType = new de.gematik.ws.conn.connectorcontext.v2.ContextType();
                 parameter.setContext(contextType);
-                parameter.setEhcHandle(msg.getMessage().getParameter().stream()
-                    .filter(s -> "CardHandle".equals(s.getKey())).findFirst().orElseThrow(() -> new IllegalArgumentException("Missing CardHandle parameter in event message")).getValue());
-               vsdServicePortType.readVSD(parameter);
+                String cardSessionId = msg.getMessage().getParameter().stream()
+                    .filter(s -> "CardHandle".equals(s.getKey())).findFirst().orElseThrow(() -> new IllegalArgumentException("Missing CardHandle parameter in event message")).getValue();
+                parameter.setEhcHandle(cardSessionId);
+                vsdServicePortType.readVSD(parameter);
 
-               var client = ClientManager.createClient();
-			   WebsocketTest.configureSSL(client);
-			   var cardlinkAVSWebSocketClientEndpoint = new CardlinkAVSWebSocketClientEndpoint();
-			   client.connectToServer(cardlinkAVSWebSocketClientEndpoint, new URI("wss://localhost:9443/websocket/null"));
-               Thread.sleep(5000); // Wait for WebSocket communication to complete before counting down the latch
-               WebsocketTest.readVSDSend.countDown();
+                var client = ClientManager.createClient();
+			    WebsocketTest.configureSSL(client);
+			    var cardlinkAVSWebSocketClientEndpoint = new CardlinkAVSWebSocketClientEndpoint(cardSessionId);
+			    client.connectToServer(cardlinkAVSWebSocketClientEndpoint, new URI("wss://localhost:9443/websocket/null"));
+                Thread.sleep(5000); // Wait for WebSocket communication to complete before counting down the latch
+                WebsocketTest.readVSDSend.countDown();
             } catch (Exception e) {
                 e.printStackTrace();
             }

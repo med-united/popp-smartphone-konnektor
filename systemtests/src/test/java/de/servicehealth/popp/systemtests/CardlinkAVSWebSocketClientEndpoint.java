@@ -38,16 +38,21 @@ public class CardlinkAVSWebSocketClientEndpoint {
 
     private static final Logger log = LoggerFactory.getLogger(CardlinkAVSWebSocketClientEndpoint.class);
 
-    public CardlinkAVSWebSocketClientEndpoint() {
+    String cardSessionId;
+
+    public CardlinkAVSWebSocketClientEndpoint(String cardSessionId) {
+        this.cardSessionId = cardSessionId;
     }
 
     @OnOpen
     public void onOpen(Session session) {
         try {
             String eRezeptTokensFromAVS = new String(getClass().getResourceAsStream("/eRezeptTokensFromAVS.json").readAllBytes());
+            eRezeptTokensFromAVS = eRezeptTokensFromAVS.replace("537e7eb7-82cd-4af0-90f2-3e514109f542", cardSessionId);
             System.out.println(eRezeptTokensFromAVS);
             session.getBasicRemote().sendText(eRezeptTokensFromAVS);
             String eRezeptBundleFromAVS = new String(getClass().getResourceAsStream("/eRezeptBundleFromAVS.json").readAllBytes());
+            eRezeptBundleFromAVS = eRezeptBundleFromAVS.replace("537e7eb7-82cd-4af0-90f2-3e514109f542", cardSessionId);
             System.out.println(eRezeptBundleFromAVS);
             session.getBasicRemote().sendText(eRezeptBundleFromAVS);
             System.out.println("AVS Websocket opened, message send");
