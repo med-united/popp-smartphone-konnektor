@@ -48,3 +48,8 @@ replay_pid*
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/java,visualstudiocode
+/.idea/
+/ehcl-api/ehcl-api.iml
+/popp-api/popp-api.iml
+/server/popp-smartphone-konnektor-server.iml
+/systemtests/systemtests.iml
