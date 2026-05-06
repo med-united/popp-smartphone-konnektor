@@ -1,14 +1,13 @@
 package de.servicehealth.popp.session;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import de.gematik.ws.conn.cardservice.v8.CardInfoType;
 import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
+import java.security.cert.X509Certificate;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-
-import java.security.cert.X509Certificate;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class EntryTest {
   @Test
