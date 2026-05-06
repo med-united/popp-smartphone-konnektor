@@ -64,7 +64,7 @@
             CRL). Die Zertifikatsprüfung wird sowohl für nonQES- als auch für QES-Zertifikate
             unterstützt.
           </ns3:Abstract>
-          <ns3:EndpointTLS Location="https://192.168.178.42:443/ws/CertificateService"/>
+          <ns3:EndpointTLS Location="$$CERTIFICATE_SERVICE_LOCATION$$"/>
         </ns3:Version>
         <ns3:Version TargetNamespace="http://ws.gematik.de/conn/CertificateService/WSDL/v6.0"
           Version="6.0.0">
@@ -75,7 +75,7 @@
             CRL). Die Zertifikatsprüfung wird sowohl für nonQES- als auch für QES-Zertifikate
             unterstützt.
           </ns3:Abstract>
-          <ns3:EndpointTLS Location="https://192.168.178.42:443/ws/CertificateService"/>
+          <ns3:EndpointTLS Location="$$CERTIFICATE_SERVICE_LOCATION$$"/>
         </ns3:Version>
       </ns3:Versions>
     </ns3:Service>
@@ -246,7 +246,7 @@
         <ns3:Version TargetNamespace="http://ws.gematik.de/conn/vsds/VSDService/v5.2"
           Version="5.2.0">
           <ns3:Abstract>VSD von eGK lesen</ns3:Abstract>
-          <ns3:EndpointTLS Location="https://192.168.178.42:443/ws/VSDService"/>
+          <ns3:EndpointTLS Location="$$VSD_SERVICE_LOCATION$$"/>
         </ns3:Version>
       </ns3:Versions>
     </ns3:Service>

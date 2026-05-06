@@ -1,11 +1,5 @@
 package de.servicehealth.popp.session;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import de.servicehealth.event.CardInserted;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -13,10 +7,13 @@ import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
-
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-
 
 @ApplicationScoped
 public class Store {
