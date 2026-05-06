@@ -1,50 +1,41 @@
 package de.servicehealth.servicediscovery;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
-import org.eclipse.microprofile.config.Config;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @Path("/connector.sds")
 public class ServiceDiscoveryController {
 
-  @Inject
-  Config config;
-
-  record ReplacementConfig(String signature, String suffix) {
-
-  }
+  @ConfigProperty(name = "popp.smartphone-connector-url")
+  String smartphoneConnectorUrl;
 
   enum LocationReplacement {
-    REAL_CONNECTOR(
-        "popp.real-connector-url",
-        List.of(new ReplacementConfig("$$AUTH_SIGNATURE_SERVICE_LOCATION$$", "/services/AuthSignatureService"))),
-    SMARTPHONE_CONNECTOR(
-        "popp.smartphone-connector-url",
-        List.of(
-            new ReplacementConfig("$$CARD_SERVICE_LOCATION$$", "/services/CardService"),
-            new ReplacementConfig("$$EVENT_SERVICE_LOCATION$$", "/services/EventService")));
+    AUTH_SERVICE("$$AUTH_SIGNATURE_SERVICE_LOCATION$$", "/konnektor-proxy/AuthSignatureService"),
+    CERT_SERVICE("$$CERTIFICATE_SERVICE_LOCATION$$", "/konnektor-proxy/CertificateService"),
+    CARD_SERVICE("$$CARD_SERVICE_LOCATION$$", "/services/CardService"),
+    EVENT_SERVICE("$$EVENT_SERVICE_LOCATION$$", "/services/EventService"),
+    VSD_SERVICE("$$VSD_SERVICE_LOCATION$$", "/services/VSDService");
 
-    private final String configParam;
-    private final List<ReplacementConfig> replacementTargets;
+    private final String signature;
+    private final String suffix;
 
-    LocationReplacement(String configParam, List<ReplacementConfig> replacementTargets) {
-      this.configParam = configParam;
-      this.replacementTargets = replacementTargets;
+    LocationReplacement(String signature, String suffix) {
+      this.signature = signature;
+      this.suffix = suffix;
     }
 
-    public String getConfigParam() {
-      return configParam;
+    public String getSignature() {
+      return signature;
     }
 
-    public List<ReplacementConfig> getReplacementTargets() {
-      return replacementTargets;
+    public String getSuffix() {
+      return suffix;
     }
   }
 
@@ -52,7 +43,8 @@ public class ServiceDiscoveryController {
 
   @PostConstruct
   public void init() {
-    try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream("connector.sds")) {
+    try (InputStream input =
+        Thread.currentThread().getContextClassLoader().getResourceAsStream("connector.sds")) {
       if (input == null) {
         throw new IllegalStateException("Resource not found: connector.sds");
       }
@@ -71,10 +63,10 @@ public class ServiceDiscoveryController {
   private String replaceLocations(String originalDocument) {
     String newDocument = originalDocument;
     for (LocationReplacement locationReplacement : LocationReplacement.values()) {
-      String locationValue = config.getValue(locationReplacement.getConfigParam(), String.class);
-      for (ReplacementConfig replacementTarget : locationReplacement.getReplacementTargets()) {
-        newDocument = newDocument.replace(replacementTarget.signature(), locationValue + replacementTarget.suffix());
-      }
+      newDocument =
+          newDocument.replace(
+              locationReplacement.getSignature(),
+              smartphoneConnectorUrl + locationReplacement.getSuffix());
     }
     return newDocument;
   }
