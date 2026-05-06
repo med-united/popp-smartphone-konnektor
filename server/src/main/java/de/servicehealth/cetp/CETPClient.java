@@ -110,16 +110,20 @@ public class CETPClient {
         message.getParameter().add(createParameter("CardHandle", cardInfoType.getCardHandle()));
         message.getParameter().add(createParameter("CardType", cardInfoType.getCardType().value()));
         message.getParameter().add(createParameter("ICCSN", cardInfoType.getIccsn()));
-        message.getParameter().add(createParameter("CtID", null));
-        message.getParameter().add(createParameter("SlotID", null));
+        // UHP: Has to be non null
+        message.getParameter().add(createParameter("CtID", ""));
+        // UHP: Has to be non null
+        message.getParameter().add(createParameter("SlotID", "1"));
         message
             .getParameter()
             .add(createParameter("InsertTime", cardInfoType.getInsertTime().toString()));
         message
             .getParameter()
             .add(createParameter("CardHolderName", cardInfoType.getCardHolderName()));
-        message.getParameter().add(createParameter("CertExpirationDate", null));
-        message.getParameter().add(createParameter("CardVersion", null));
+        // UHP: Has to be non null
+        message.getParameter().add(createParameter("CertExpirationDate", ""));
+        // UHP: Has to be non null
+        message.getParameter().add(createParameter("CardVersion", ""));
         message.getParameter().add(createParameter("KVNR", cardInfoType.getKvnr()));
         event.setMessage(message);
 

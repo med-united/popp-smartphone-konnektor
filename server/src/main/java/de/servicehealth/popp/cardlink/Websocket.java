@@ -69,7 +69,12 @@ public class Websocket {
         return;
       }
       JsonObject jsonObject = jsonArray.getJsonObject(0);
-      String cardSessionId = jsonArray.getString(1); // cardSessionId
+      String cardSessionId; // cardSessionId
+      try {
+        cardSessionId = jsonArray.getString(1);
+      } catch (Exception e) {
+        cardSessionId = "";
+      }
       String correlationId = null;
       if (jsonArray.size() < 3) {
         LOG.warning("Received JSON array has no correlationId");
