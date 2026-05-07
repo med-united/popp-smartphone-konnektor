@@ -57,6 +57,7 @@ public class ServiceDiscoveryController {
   @GET
   @Produces(MediaType.APPLICATION_XML)
   public String getServiceDiscoverDocument() {
+    System.out.println("GETTING SDS");
     return serviceDiscoversWithReplacedTargets;
   }
 
