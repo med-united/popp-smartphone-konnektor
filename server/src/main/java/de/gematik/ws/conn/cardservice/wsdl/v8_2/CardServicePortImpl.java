@@ -230,14 +230,18 @@ public class CardServicePortImpl implements CardServicePortType {
     // find existing entry in store
     Session session = store.getSessionForCardHandle(tlsCertCN, parameter.getCardHandle());
 
+    if (session == null) {
+      throw new FaultMessage("Can not establish session with card: " + parameter.getCardHandle());
+    }
+
     // create new entry if not exists
-    store.getCardSessions().put(parameter.getCardHandle(), session);
+    // store.getCardSessions().put(parameter.getCardHandle(), session);
 
     // Create and return a StartCardSessionResponse
     StartCardSessionResponse response = new StartCardSessionResponse();
-    // response.setSessionId(sessionId);
+    response.setSessionId(parameter.getCardHandle());
 
-    response.setSessionId("537e7eb7-82cd-4af0-90f2-3e514109f542");
+    // response.setSessionId("537e7eb7-82cd-4af0-90f2-3e514109f542");
     return response;
   }
 
@@ -268,6 +272,7 @@ public class CardServicePortImpl implements CardServicePortType {
 
   private String getTlsCertCN() {
     String tlsCertCN = identity.getPrincipal().getName();
+    tlsCertCN = tlsCertCN.replace("CN=", "");
     if ("".equals(tlsCertCN) || tlsCertCN == null) {
       tlsCertCN = "null";
     }

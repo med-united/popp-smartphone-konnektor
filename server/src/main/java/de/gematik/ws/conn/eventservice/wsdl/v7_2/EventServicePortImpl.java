@@ -120,12 +120,9 @@ public class EventServicePortImpl implements EventServicePortType {
           DatatypeFactory.newInstance()
               .newXMLGregorianCalendar(
                   GregorianCalendar.from(Instant.now().atZone(ZoneOffset.UTC)));
+      subscriptionTypes.removeIf(
+          t -> t.getTerminationTime().compare(now) == DatatypeConstants.LESSER);
 
-      List<SubscriptionType> nonTerminatedSubscriptions =
-          subscriptionTypes.stream()
-              .filter(type -> type.getTerminationTime().compare(now) == DatatypeConstants.GREATER)
-              .toList();
-      subscriptions.getTlsCertCN2subscriptions().put(tlsCertCN, nonTerminatedSubscriptions);
     } catch (DatatypeConfigurationException e) {
       throw new RuntimeException(e);
     }
