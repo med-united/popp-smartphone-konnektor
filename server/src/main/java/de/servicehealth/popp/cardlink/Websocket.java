@@ -1,9 +1,8 @@
 package de.servicehealth.popp.cardlink;
 
 import de.gematik.ws.conn.cardservice.wsdl.v8_2.NewAPDUForSession;
-import de.gematik.ws.conn.cardservice.wsdl.v8_2.SendApduPayloadWithSession;
-import de.servicehealth.popp.session.Entry;
 import de.servicehealth.popp.session.Store;
+import de.servicehealth.popp.session.WebsocketEntry;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
@@ -20,8 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,7 +34,7 @@ public class Websocket {
     // Handle new connection
     LOG.info("WebSocket opened for tlsCertCN: " + tlsCertCN);
     // Add session to store
-    store.addEntry(new Entry(tlsCertCN, webSocketSession));
+    store.addEntry(new WebsocketEntry(tlsCertCN, webSocketSession));
 
     // send pin to websocket client
     webSocketSession.getAsyncRemote().sendText("123456");
@@ -50,7 +47,6 @@ public class Websocket {
     LOG.fine("Received message from " + tlsCertCN + ": " + message);
     // Echo the message back
     try {
-
       JsonStructure jsonStructure =
           Json.createReader(new ByteArrayInputStream(message.getBytes())).read();
       if (!(jsonStructure instanceof JsonArray)) {
@@ -97,7 +93,7 @@ public class Websocket {
               cardSessionId);
         } else if (type.equals("sendAPDUResponse")) {
           // Handle sendAPDUResponse message
-          Optional<Entry> entry = store.findEntry(tlsCertCN, cardSessionId);
+          Optional<WebsocketEntry> entry = store.findEntry(tlsCertCN, cardSessionId);
           if (entry.isPresent()) {
             if (correlationId != null) {
               LOG.fine("Completing future for correlationId: " + correlationId);
@@ -110,7 +106,7 @@ public class Websocket {
               String hex = HexFormat.of().formatHex(Base64.getDecoder().decode(response));
               LOG.fine("Decoded APDU response hex: " + hex);
 
-              entry.get().getApduResponses().get(correlationId).complete(hex);
+              entry.get().completeApduResponse(correlationId, hex);
             } else {
               LOG.warning("No correlationId provided for sendAPDUResponse");
             }
@@ -122,10 +118,8 @@ public class Websocket {
                     + cardSessionId);
           }
         } else if (type.equals("eRezeptTokensFromAVS") || type.equals("eRezeptBundlesFromAVS")) {
-          Optional<Entry> entry = store.findEntry(tlsCertCN, cardSessionId);
-          if (entry.isPresent()) {
-            entry.get().getSession().getAsyncRemote().sendText(message);
-          }
+          Optional<WebsocketEntry> entry = store.findEntry(tlsCertCN, cardSessionId);
+          entry.ifPresent(websocketEntry -> websocketEntry.sendText(message));
         }
       } else {
         LOG.fine("No type field in message");
@@ -148,57 +142,14 @@ public class Websocket {
   @OnClose
   public void onClose(Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
     // Remove session from store
-    store.removeEntry(tlsCertCN, webSocketSession);
+    store.removeEntryBySessionId(webSocketSession.getId());
     // Handle connection close
     LOG.info("WebSocket closed for tlsCertCN: " + tlsCertCN);
   }
 
   public void onNewAPDUForSession(@Observes NewAPDUForSession event) {
 
-    Optional<Entry> entry = store.findEntry(event.tlsCertCN, event.cardSessionId);
-    if (entry.isPresent()) {
-      LOG.fine("Found entry for tlsCertCN and cardSessionId in onNewAPDUForSession");
-      entry.get().getApduResponses().clear(); // clear any old APDU responses for this session
-    } else {
-      LOG.warning(
-          "No entry found for tlsCertCN and cardSessionId in onNewAPDUForSession: "
-              + event.tlsCertCN
-              + ", "
-              + event.cardSessionId);
-    }
-  }
-
-  public void onSendApduPayloadWithSession(@Observes SendApduPayloadWithSession event) {
-    Session session = event.session;
-    if (session != null && session.isOpen()) {
-      try {
-        String correlationId = UUID.randomUUID().toString();
-        Optional<Entry> entry = store.findEntry(event.tlsCertCN, event.cardSessionId);
-        if (entry.isPresent()) {
-          entry.get().getApduResponses().put(correlationId, new CompletableFuture<>());
-          LOG.fine("Found entry for tlsCertCN and cardSessionId");
-          JsonArray sendApduPayload =
-              Json.createArrayBuilder()
-                  .add(
-                      Json.createObjectBuilder()
-                          .add("type", "sendAPDU")
-                          .add("payload", event.envelope.getPayload()))
-                  .add(event.cardSessionId)
-                  .add(correlationId)
-                  .build();
-          session.getBasicRemote().sendText(sendApduPayload.toString());
-        } else {
-          LOG.warning(
-              "No entry found for tlsCertCN and cardSessionId: "
-                  + event.tlsCertCN
-                  + ", "
-                  + event.cardSessionId);
-        }
-      } catch (Exception e) {
-        LOG.log(Level.SEVERE, "Failed to send APDU command over WebSocket", e);
-      }
-    } else {
-      LOG.warning("No open WebSocket session found. tlsCertCN: " + event.tlsCertCN);
-    }
+    WebsocketEntry entry = store.findEntry(event.tlsCertCN, event.cardSessionId).orElseThrow();
+    entry.startApduSession();
   }
 }

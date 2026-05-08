@@ -9,11 +9,11 @@ import java.security.cert.X509Certificate;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-class EntryTest {
+class WebsocketEntryTest {
   @Test
   void testSetRegisterEgkPayload_parsesCertificateAndSetsCardInfoType() throws Exception {
     // Arrange
-    Entry entry = new Entry("CN=test", Mockito.mock(Session.class));
+    WebsocketEntry entry = new WebsocketEntry("CN=test", Mockito.mock(Session.class));
     JsonObject payload = Mockito.mock(JsonObject.class);
 
     // Use a real X509Certificate for testing
@@ -23,7 +23,7 @@ class EntryTest {
     Mockito.when(payload.getString("cardSessionId")).thenReturn("session123");
 
     // Act
-    entry.setRegisterEgkPayload(payload);
+    entry.registerCard("dwd", payload);
 
     // Assert
     X509Certificate cert = entry.getX509AuthECC();

@@ -10,11 +10,12 @@ import de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse;
 import de.gematik.ws.conn.eventservice.v7.SubscribeResponse;
 import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
 import de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse;
-import de.servicehealth.popp.session.Entry;
 import de.servicehealth.popp.session.Store;
+import de.servicehealth.popp.session.WebsocketEntry;
 import io.quarkus.logging.Log;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -252,18 +253,20 @@ public class EventServicePortImpl implements EventServicePortType {
       de.gematik.ws.conn.eventservice.v7.GetCardsResponse _return = new GetCardsResponse();
       _return.setCards(new de.gematik.ws.conn.cardservice.v8.Cards());
       _return.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
-      List<Entry> entries = store.getTlsCertCNs2cards().get(tlsCertCN);
+      List<WebsocketEntry> entries = store.getEntriesOfCertCN(tlsCertCN);
       if (entries != null) {
         _return
             .getCards()
             .getCard()
-            .addAll(entries.stream().map(entry -> entry.getCardInfoType()).toList());
+            .addAll(entries.stream().map(WebsocketEntry::getCardInfoType).toList());
       }
 
       // In order to make ere ps app happy we need to tell it that an smcb actually exists
       var smcb = new CardInfoType();
       smcb.setCardHandle("SMC-B-6");
       smcb.setCardType(CardTypeType.SMC_B);
+      smcb.setInsertTime(WebsocketEntry.nowAsXMLGregorianCalendar());
+      smcb.setSlotId(BigInteger.valueOf(1L));
       _return.getCards().getCard().add(smcb);
 
       _return.getStatus().setResult("OK");
