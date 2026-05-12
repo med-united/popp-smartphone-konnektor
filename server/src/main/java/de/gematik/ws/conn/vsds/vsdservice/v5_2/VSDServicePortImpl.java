@@ -67,7 +67,8 @@ public class VSDServicePortImpl implements VSDServicePortType {
       LOG.info("Response body: " + poppToken);
       scanner.close();
       is.close();
-      _return.setPruefungsnachweis(poppToken.getBytes());
+      var poppTokenMessage = "popp-token: " + poppToken;
+      _return.setPruefungsnachweis(poppTokenMessage.getBytes());
     } catch (Exception e) {
       LOG.severe("POST request to " + uri + " failed: " + e.getMessage());
     }

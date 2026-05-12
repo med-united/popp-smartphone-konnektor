@@ -15,9 +15,8 @@ import de.gematik.ws.conn.cardservice.v8_2_1.StopCardSessionResponse;
 import de.gematik.ws.conn.cardservice.v8_2_1.UnblockPin;
 import de.gematik.ws.conn.cardservice.v8_2_1.VerifyPin;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
-import de.servicehealth.cardlink.model.SendApduEnvelope;
-import de.servicehealth.cardlink.model.SendApduEnvelope.TypeEnum;
 import de.servicehealth.cardlink.model.SendApduPayload;
+import de.servicehealth.popp.session.ApduScenarioInitilizedEvent;
 import de.servicehealth.popp.session.Store;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Header;
@@ -32,12 +31,12 @@ import jakarta.websocket.Session;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.Key;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
@@ -57,6 +56,8 @@ public class CardServicePortImpl implements CardServicePortType {
   @Inject Event<SendApduPayloadWithSession> sendApduPayloadWithSessionEvent;
 
   @Inject Event<NewAPDUForSession> newAPDUForSessionEvent;
+
+  @Inject Event<ApduScenarioInitilizedEvent> apduScenarioInitilizedEventEvent;
 
   private static final Logger LOG = Logger.getLogger(CardServicePortImpl.class.getName());
 
@@ -151,14 +152,19 @@ public class CardServicePortImpl implements CardServicePortType {
 
     newAPDUForSessionEvent.fire(new NewAPDUForSession(session, sessionId, tlsCertCN));
     // Process APDU commands from standardScenarioMessage
+    var adpuPayloads = new ArrayList<String>();
     for (Map<String, Object> step :
         (List<Map<String, Object>>) standardScenarioMessage.get("steps")) {
       String commandApduHex = (String) step.get("commandApdu");
       // Here you would send the APDU command to the card and get the response
       // For demonstration, we will just log the command
       LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
-      sendCardlinkWebsocketMessage(tlsCertCN, commandApduHex, session, sessionId);
+      adpuPayloads.add(sendCardlinkWebsocketMessage(commandApduHex, sessionId));
     }
+
+    var entry = store.findEntry(tlsCertCN, sessionId).orElseThrow();
+    entry.initializeApduScenario(adpuPayloads);
+    apduScenarioInitilizedEventEvent.fire(new ApduScenarioInitilizedEvent(entry));
 
     SecureSendAPDUResponse response = new SecureSendAPDUResponse();
     response.setSignedScenarioResponse(new SignedScenarioResponseType());
@@ -166,19 +172,25 @@ public class CardServicePortImpl implements CardServicePortType {
         .getSignedScenarioResponse()
         .setResponseApduList(new SignedScenarioResponseType.ResponseApduList());
 
-    List<CompletableFuture<String>> futureResponses = store.getAPDUResponses(tlsCertCN, sessionId);
+    List<String> websocketResponses;
+    try {
+      websocketResponses =
+          store
+              .getAPDUResponses(tlsCertCN, sessionId)
+              .get(10000, java.util.concurrent.TimeUnit.MILLISECONDS);
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
+      throw new FaultMessage("Error getting APDU response: " + e.getMessage());
+    } finally {
+      entry.clearApduScenario();
+    }
 
-    for (var futureResponse : futureResponses) {
-      try {
-        response
-            .getSignedScenarioResponse()
-            .getResponseApduList()
-            .getResponseApdu()
-            .add(futureResponse.get(10000, java.util.concurrent.TimeUnit.MILLISECONDS));
-      } catch (InterruptedException | ExecutionException | TimeoutException e) {
-        LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
-        throw new FaultMessage("Error getting APDU response: " + e.getMessage());
-      }
+    for (var websocketResponse : websocketResponses) {
+      response
+          .getSignedScenarioResponse()
+          .getResponseApduList()
+          .getResponseApdu()
+          .add(websocketResponse);
     }
 
     LOG.info("Collected all APDUs sending answer for session: " + sessionId);
@@ -186,22 +198,14 @@ public class CardServicePortImpl implements CardServicePortType {
     return response;
   }
 
-  private void sendCardlinkWebsocketMessage(
-      String tlsCertCN, String apduCommandHex, Session session, String cardSessionId) {
+  private String sendCardlinkWebsocketMessage(String apduCommandHex, String cardSessionId) {
     // Create SendApduEnvelope message
-    SendApduEnvelope envelope = new SendApduEnvelope();
-    envelope.setType(TypeEnum.SEND_APDU);
     SendApduPayload sendApduPayload = new SendApduPayload();
     sendApduPayload.setApdu(
         Base64.getEncoder().encodeToString(HexFormat.of().parseHex(apduCommandHex)));
     sendApduPayload.cardSessionId(cardSessionId);
-    envelope.setPayload(
-        Base64.getEncoder()
-            .encodeToString(JsonbBuilder.create().toJson(sendApduPayload).getBytes()));
-
-    // Send the message over WebSocket
-    sendApduPayloadWithSessionEvent.fire(
-        new SendApduPayloadWithSession(envelope, session, cardSessionId, tlsCertCN));
+    return Base64.getEncoder()
+        .encodeToString(JsonbBuilder.create().toJson(sendApduPayload).getBytes());
   }
 
   @Override
@@ -257,7 +261,7 @@ public class CardServicePortImpl implements CardServicePortType {
 
   @Override
   public StopCardSessionResponse stopCardSession(StopCardSession parameter) throws FaultMessage {
-    store.getCardSessions().remove(parameter.getSessionId());
+    store.removeEntryBySessionId(parameter.getSessionId());
     // Create and return a StopCardSessionResponse
     StopCardSessionResponse response = new StopCardSessionResponse();
     response.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
