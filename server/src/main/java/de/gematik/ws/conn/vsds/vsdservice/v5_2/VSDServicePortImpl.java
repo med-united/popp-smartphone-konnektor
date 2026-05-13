@@ -1,11 +1,16 @@
 package de.gematik.ws.conn.vsds.vsdservice.v5_2;
 
+import static org.jboss.resteasy.reactive.RestResponse.StatusCode.OK;
+
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
-import jakarta.json.Json;
-import java.io.ByteArrayInputStream;
-import java.io.OutputStreamWriter;
+import io.vertx.core.json.JsonObject;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.ext.web.client.WebClient;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 import java.net.URI;
+import java.time.Duration;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -26,6 +31,15 @@ public class VSDServicePortImpl implements VSDServicePortType {
   @ConfigProperty(name = "popp.client-url", defaultValue = "http://localhost:8081")
   String poppClientUrl;
 
+  @Inject Vertx vertx;
+
+  WebClient webClient;
+
+  @PostConstruct
+  private void init() {
+    this.webClient = WebClient.create(vertx);
+  }
+
   @Override
   public ReadVSDResponse readVSD(ReadVSD parameter) throws FaultMessage {
     LOG.info("Executing operation readVSD");
@@ -34,41 +48,34 @@ public class VSDServicePortImpl implements VSDServicePortType {
     // Do GET call to PoPP client to trigger PoPP Token dance
     // https://github.com/gematik/popp-sample-code/blob/main/popp-client/src/main/java/de/gematik/refpopp/popp_client/controller/CardRestController.java
     URI uri = URI.create(poppClientUrl + "/token");
+
+    JsonObject body =
+        new JsonObject()
+            .put("communicationType", "contact-connector")
+            .put("clientSessionId", parameter.getEhcHandle());
+
     try {
-      java.net.HttpURLConnection conn = (java.net.HttpURLConnection) uri.toURL().openConnection();
-      conn.setRequestMethod("POST");
-      conn.setDoOutput(true);
-      conn.setDoInput(true);
-      conn.setRequestProperty("Accept", "application/json");
-      conn.setRequestProperty("Content-Type", "application/json");
-      conn.setConnectTimeout(30000);
-      conn.setReadTimeout(30000);
-      OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
-      wr.write(
-          "{"
-              + "\"communicationType\": \"contact-connector\","
-              + "\"clientSessionId\": \""
-              + parameter.getEhcHandle()
-              + "\""
-              + "}");
-      wr.flush();
-      int responseCode = conn.getResponseCode();
+      var response =
+          webClient
+              .postAbs(uri.toString())
+              .putHeader("Accept", "application/json")
+              .sendJson(body)
+              .await()
+              .atMost(Duration.ofSeconds(10));
+
+      int responseCode = response.statusCode();
+
       LOG.info("POST " + uri + " response code: " + responseCode);
-      java.io.InputStream is =
-          (responseCode >= 200 && responseCode < 300)
-              ? conn.getInputStream()
-              : conn.getErrorStream();
-      java.util.Scanner scanner = new java.util.Scanner(is).useDelimiter("\\A");
-      String poppJson = scanner.hasNext() ? scanner.next() : "";
-      String poppToken =
-          Json.createReader(new ByteArrayInputStream(poppJson.getBytes()))
-              .readObject()
-              .getString("token");
-      LOG.info("Response body: " + poppToken);
-      scanner.close();
-      is.close();
-      var poppTokenMessage = "popp-token: " + poppToken;
-      _return.setPruefungsnachweis(poppTokenMessage.getBytes());
+
+      if (responseCode != OK) {
+        LOG.severe("POST request to " + uri + " returned non 200 status: \n " + response.body());
+        throw new FaultMessage("Fetching PoPP token has failed.");
+      }
+
+      LOG.info("Response body: " + response.body());
+
+      String poppToken = response.bodyAsJsonObject().getString("token");
+      _return.setPruefungsnachweis(("popp-token: " + poppToken).getBytes());
     } catch (Exception e) {
       LOG.severe("POST request to " + uri + " failed: " + e.getMessage());
     }
