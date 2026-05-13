@@ -47,6 +47,14 @@
       <artifactId>quarkus-rest-client</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-vertx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.smallrye.reactive</groupId>
+      <artifactId>smallrye-mutiny-vertx-web-client</artifactId>
+    </dependency>
+    <dependency>
       <groupId>de.servicehealth</groupId>
       <artifactId>ehcl-api</artifactId>
       <version>${project.version}</version>
