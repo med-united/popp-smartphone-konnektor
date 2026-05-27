@@ -4,6 +4,7 @@ import static org.jboss.resteasy.reactive.RestResponse.StatusCode.OK;
 
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSD;
 import de.gematik.ws.conn.vsds.vsdservice.v5.ReadVSDResponse;
+import de.servicehealth.popp.session.Store;
 import io.vertx.core.json.JsonObject;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.ext.web.client.WebClient;
@@ -33,6 +34,8 @@ public class VSDServicePortImpl implements VSDServicePortType {
 
   @Inject Vertx vertx;
 
+  @Inject Store store;
+
   WebClient webClient;
 
   @PostConstruct
@@ -45,6 +48,9 @@ public class VSDServicePortImpl implements VSDServicePortType {
     LOG.info("Executing operation readVSD");
     ReadVSDResponse _return = new ReadVSDResponse();
 
+    var entry = store.findEntry(parameter.getEhcHandle()).orElseThrow();
+    var certCN = entry.getTlsCertCN().substring(0, 20);
+
     // Do GET call to PoPP client to trigger PoPP Token dance
     // https://github.com/gematik/popp-sample-code/blob/main/popp-client/src/main/java/de/gematik/refpopp/popp_client/controller/CardRestController.java
     URI uri = URI.create(poppClientUrl + "/token");
@@ -52,6 +58,7 @@ public class VSDServicePortImpl implements VSDServicePortType {
     JsonObject body =
         new JsonObject()
             .put("communicationType", "contact-connector")
+            .put("cardId", certCN)
             .put("clientSessionId", parameter.getEhcHandle());
 
     try {

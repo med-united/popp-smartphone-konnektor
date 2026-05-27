@@ -49,58 +49,6 @@ public class CETPClient {
       // Further processing based on subscriptions
       for (var subscription : subscriptions.getTlsCertCN2subscriptions().get(tlsCertCN)) {
         LOG.info("Processing subscription: " + subscription);
-        /*
-        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-        <Event xmlns="http://ws.gematik.de/conn/EventService/v7.2">
-        <Topic>CARD/INSERTED</Topic>
-        <Type>Operation</Type>
-        <Severity>Info</Severity>
-        <SubscriptionID>6404443e-eb13-49d1-93a7-ec78f75573bb</SubscriptionID>
-        <Message>
-            <Parameter>
-                <Key>CardHandle</Key>
-                <Value>c2006cfb-876b-4f51-8aed-6db04e03732c</Value>
-            </Parameter>
-            <Parameter>
-                <Key>CardType</Key>
-                <Value>EGK</Value>
-            </Parameter>
-            <Parameter>
-                <Key>ICCSN</Key>
-                <Value>80276881029979541601</Value>
-            </Parameter>
-            <Parameter>
-                <Key>CtID</Key>
-                <Value>00:1B:B5:08:90:41</Value>
-            </Parameter>
-            <Parameter>
-                <Key>SlotID</Key>
-                <Value>1</Value>
-            </Parameter>
-            <Parameter>
-                <Key>InsertTime</Key>
-                <Value>2024-02-24T21:34:13.734Z</Value>
-            </Parameter>
-            <Parameter>
-                <Key>CardHolderName</Key>
-                <Value>Bernd Blau</Value>
-            </Parameter>
-            <Parameter>
-                <Key>CertExpirationDate</Key>
-                <Value>2028-02-21T13:11:56Z</Value>
-            </Parameter>
-            <Parameter>
-                <Key>CardVersion</Key>
-                <Value>COSVERSION 4.4.1, OBJECTSYSTEMVERSION 4.5.1</Value>
-            </Parameter>
-            <Parameter>
-                <Key>KVNR</Key>
-                <Value>K210140155</Value>
-            </Parameter>
-        </Message>
-        </Event>
-        */
-        // Implement your logic here
         Event event = new Event();
         event.setTopic("CARD/INSERTED");
         event.setType(EventType.OPERATION);
@@ -111,7 +59,7 @@ public class CETPClient {
         message.getParameter().add(createParameter("CardType", cardInfoType.getCardType().value()));
         message.getParameter().add(createParameter("ICCSN", cardInfoType.getIccsn()));
         // UHP: Has to be non null
-        message.getParameter().add(createParameter("CtID", ""));
+        message.getParameter().add(createParameter("CtID", cardInfoType.getCtId()));
         // UHP: Has to be non null
         message.getParameter().add(createParameter("SlotID", "1"));
         message

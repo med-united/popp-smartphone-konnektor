@@ -6,8 +6,6 @@ public class CardInserted {
   private String tlsCertCN;
   private CardInfoType cardType;
 
-  public CardInserted() {}
-
   public CardInserted(String tlsCertCN, CardInfoType cardType) {
     this.tlsCertCN = tlsCertCN;
     this.cardType = cardType;
