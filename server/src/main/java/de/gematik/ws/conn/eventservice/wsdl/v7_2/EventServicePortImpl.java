@@ -15,6 +15,7 @@ import de.servicehealth.popp.session.WebsocketEntry;
 import io.quarkus.logging.Log;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -25,10 +26,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
+import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.ASN1String;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -109,6 +115,7 @@ public class EventServicePortImpl implements EventServicePortType {
 
   private List<SubscriptionType> getSubscriptions() {
     String tlsCertCN = getTlsCertCN();
+    String cardHandle = getSMCBCardHandle();
     LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
 
     List<SubscriptionType> subscriptionTypes =
@@ -252,6 +259,7 @@ public class EventServicePortImpl implements EventServicePortType {
     System.out.println(parameter);
     var cardTypeParameter = Optional.ofNullable(parameter.getCardType());
     String tlsCertCN = getTlsCertCN();
+    String cardHandle = getSMCBCardHandle();
     LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
 
     de.gematik.ws.conn.eventservice.v7.GetCardsResponse _return = new GetCardsResponse();
@@ -269,7 +277,7 @@ public class EventServicePortImpl implements EventServicePortType {
     if (cardTypeParameter.map(card -> card == CardTypeType.SMC_B).orElse(true)) {
       // In order to make ere ps app happy we need to tell it that an smcb actually exists
       var smcb = new CardInfoType();
-      smcb.setCardHandle(smcbHandle);
+      smcb.setCardHandle(cardHandle);
       smcb.setCardType(CardTypeType.SMC_B);
       smcb.setInsertTime(WebsocketEntry.nowAsXMLGregorianCalendar());
       smcb.setSlotId(BigInteger.valueOf(1L));
@@ -281,7 +289,34 @@ public class EventServicePortImpl implements EventServicePortType {
   }
 
   private String getTlsCertCN() {
-    String tlsCertCN = identity.getPrincipal().getName();
-    return tlsCertCN.isEmpty() ? null : tlsCertCN.replace("CN=", "");
+    LdapName ldapName;
+    try {
+      ldapName = new LdapName(identity.getPrincipal().getName());
+    } catch (InvalidNameException e) {
+      throw new RuntimeException(e);
+    }
+    String cn =
+        ldapName.getRdns().stream()
+            .filter(rdn -> rdn.getType().equalsIgnoreCase("CN"))
+            .map(rdn -> rdn.getValue().toString())
+            .findFirst()
+            .orElseThrow();
+    return cn.isEmpty() ? null : cn.replace("CN=", "");
+  }
+
+  private String getSMCBCardHandle() {
+    try {
+      var ldapName = new LdapName(identity.getPrincipal().getName());
+      Object raw =
+          ldapName.getRdns().stream()
+              .filter(rdn -> rdn.getType().equals("2.5.4.5"))
+              .map(Rdn::getValue)
+              .findFirst()
+              .orElseThrow();
+      byte[] bytes = (byte[]) raw;
+      return ((ASN1String) ASN1Primitive.fromByteArray(bytes)).getString();
+    } catch (InvalidNameException | IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

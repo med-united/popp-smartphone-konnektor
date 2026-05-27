@@ -145,12 +145,15 @@ public class CardServicePortImpl implements CardServicePortType {
         (Map<String, Object>) ((Claims) jwt.getPayload()).get("message");
     String sessionId = (String) standardScenarioMessage.get("clientSessionId");
     // Find session in card sessions
-    Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
-    if (session == null) {
-      throw new FaultMessage("No session found for card handle: " + sessionId);
-    }
+    // Session session = store.getSessionForCardHandle(tlsCertCN, sessionId);
+    var entry =
+        store
+            .findEntry(sessionId)
+            .orElseThrow(() -> new FaultMessage("No session found for card handle: " + sessionId));
+    var backMappedCertCN = entry.getTlsCertCN();
+    var session = entry.getSession();
 
-    newAPDUForSessionEvent.fire(new NewAPDUForSession(session, sessionId, tlsCertCN));
+    newAPDUForSessionEvent.fire(new NewAPDUForSession(session, sessionId, backMappedCertCN));
     // Process APDU commands from standardScenarioMessage
     var adpuPayloads = new ArrayList<String>();
     for (Map<String, Object> step :
@@ -162,7 +165,6 @@ public class CardServicePortImpl implements CardServicePortType {
       adpuPayloads.add(sendCardlinkWebsocketMessage(commandApduHex, sessionId));
     }
 
-    var entry = store.findEntry(tlsCertCN, sessionId).orElseThrow();
     entry.initializeApduScenario(adpuPayloads);
     apduScenarioInitilizedEventEvent.fire(new ApduScenarioInitilizedEvent(entry));
 
@@ -176,8 +178,9 @@ public class CardServicePortImpl implements CardServicePortType {
     try {
       websocketResponses =
           store
-              .getAPDUResponses(tlsCertCN, sessionId)
+              .getAPDUResponses(backMappedCertCN, sessionId)
               .get(10000, java.util.concurrent.TimeUnit.MILLISECONDS);
+      LOG.info("Websocket Responses: ");
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
       throw new FaultMessage("Error getting APDU response: " + e.getMessage());
@@ -261,7 +264,7 @@ public class CardServicePortImpl implements CardServicePortType {
 
   @Override
   public StopCardSessionResponse stopCardSession(StopCardSession parameter) throws FaultMessage {
-    store.removeEntryBySessionId(parameter.getSessionId());
+    // store.removeEntryBySessionId(parameter.getSessionId());
     // Create and return a StopCardSessionResponse
     StopCardSessionResponse response = new StopCardSessionResponse();
     response.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());

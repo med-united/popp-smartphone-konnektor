@@ -207,6 +207,17 @@
           </ns3:Abstract>
           <ns3:EndpointTLS Location="$$EVENT_SERVICE_LOCATION$$"/>
         </ns3:Version>
+        <ns3:Version TargetNamespace="http://ws.gematik.de/conn/EventService/WSDL/v7.2"
+          Version="7.2.0-real-connector">
+          <ns3:Abstract>Der Systeminformationsdienst stellt Basisdiensten, Fachmodulen und
+            Clientsystemen sowohl aktiv (Push-Mechanismus) wie passiv (Pull-Mechanismus)
+            Informationen zur Verfügung. Dabei erhebt er selbst keine Daten, sondern dient nur als
+            zentraler Mechanismus, der von anderen Basisdiensten und Fachmodulen zur Verteilung und
+            Bereitstellung derer Informationen verwendet werden kann.
+          </ns3:Abstract>
+          <ns3:EndpointTLS Location="$$EVENT_SERVICE_LOCATION_REAL$$"/>
+        </ns3:Version>
+
       </ns3:Versions>
     </ns3:Service>
     <ns3:Service Name="AMTSService">

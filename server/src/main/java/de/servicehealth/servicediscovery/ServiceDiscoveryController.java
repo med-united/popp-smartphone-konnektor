@@ -20,6 +20,7 @@ public class ServiceDiscoveryController {
     CERT_SERVICE("$$CERTIFICATE_SERVICE_LOCATION$$", "/konnektor-proxy/CertificateService"),
     CARD_SERVICE("$$CARD_SERVICE_LOCATION$$", "/services/CardService"),
     EVENT_SERVICE("$$EVENT_SERVICE_LOCATION$$", "/services/EventService"),
+    EVENT_SERVICE_REAL("$$EVENT_SERVICE_LOCATION_REAL$$", "/konnektor-proxy/EventService"),
     VSD_SERVICE("$$VSD_SERVICE_LOCATION$$", "/services/VSDService");
 
     private final String signature;
@@ -57,7 +58,6 @@ public class ServiceDiscoveryController {
   @GET
   @Produces(MediaType.APPLICATION_XML)
   public String getServiceDiscoverDocument() {
-    System.out.println("GETTING SDS");
     return serviceDiscoversWithReplacedTargets;
   }
 

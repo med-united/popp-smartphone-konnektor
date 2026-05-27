@@ -116,6 +116,7 @@ public class WebsocketEntry {
     CardInfoType cardInfo = new CardInfoType();
     // Example: set subject DN and serial number from certificate
     cardInfo.setCardHandle(cardSessionId2);
+    cardInfo.setCtId(cardSessionId2);
     cardInfo.setCardType(CardTypeType.EGK);
     cardInfo.setIccsn(x509AuthECC2.getSerialNumber().toString());
     // Robust parsing of DN using LDAP library

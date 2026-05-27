@@ -7,6 +7,7 @@ import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,9 @@ public class Store {
   @Inject Event<CardInserted> cardInsertedEvent;
 
   public List<WebsocketEntry> getEntriesOfCertCN(String certCn) {
-    return tlsCertCNs2cards.get(certCn).stream().filter(WebsocketEntry::isEgkRegistered).toList();
+    return tlsCertCNs2cards.getOrDefault(certCn, Collections.emptyList()).stream()
+        .filter(WebsocketEntry::isEgkRegistered)
+        .toList();
   }
 
   public void addEntry(WebsocketEntry entry) {
@@ -43,9 +46,14 @@ public class Store {
 
   public Optional<WebsocketEntry> findEntry(String tlsCertCN, String cardSessionId) {
     return this.tlsCertCNs2cards.get(tlsCertCN).stream()
-        .filter(
-            entry ->
-                entry.getCardSessionId() != null && entry.getCardSessionId().equals(cardSessionId))
+        .filter(entry -> entry.isEgkRegistered() && entry.getCardSessionId().equals(cardSessionId))
+        .findFirst();
+  }
+
+  public Optional<WebsocketEntry> findEntry(String cardSessionId) {
+    return this.tlsCertCNs2cards.values().stream()
+        .flatMap(Collection::stream)
+        .filter(entry -> entry.isEgkRegistered() && entry.getCardSessionId().equals(cardSessionId))
         .findFirst();
   }
 
