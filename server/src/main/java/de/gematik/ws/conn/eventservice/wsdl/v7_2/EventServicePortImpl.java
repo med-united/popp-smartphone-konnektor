@@ -7,7 +7,9 @@ import de.gematik.ws.conn.cardservicecommon.v2.CardTypeType;
 import de.gematik.ws.conn.connectorcommon.v5.Status;
 import de.gematik.ws.conn.eventservice.v7.GetCardsResponse;
 import de.gematik.ws.conn.eventservice.v7.GetSubscriptionResponse;
+import de.gematik.ws.conn.eventservice.v7.RenewSubscriptionsResponse;
 import de.gematik.ws.conn.eventservice.v7.SubscribeResponse;
+import de.gematik.ws.conn.eventservice.v7.SubscriptionRenewal;
 import de.gematik.ws.conn.eventservice.v7.SubscriptionType;
 import de.gematik.ws.conn.eventservice.v7.UnsubscribeResponse;
 import de.servicehealth.popp.session.Store;
@@ -20,6 +22,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Optional;
@@ -88,11 +91,7 @@ public class EventServicePortImpl implements EventServicePortType {
         // We have to set a termination time, even if none is passed. Otherwise some Primary Systems
         // will fail when retrieving the subscription
         if (parameterSubscription.getTerminationTime() == null) {
-          XMLGregorianCalendar xmlCal =
-              DatatypeFactory.newInstance()
-                  .newXMLGregorianCalendar(
-                      GregorianCalendar.from(
-                          Instant.now().plus(1, ChronoUnit.HOURS).atZone(ZoneOffset.UTC)));
+          XMLGregorianCalendar xmlCal = getTimeInOneHour();
           parameterSubscription.setTerminationTime(xmlCal);
         }
         parameter.getSubscription().setSubscriptionID(newSubscriptionId);
@@ -240,14 +239,44 @@ public class EventServicePortImpl implements EventServicePortType {
       de.gematik.ws.conn.eventservice.v7.RenewSubscriptions parameter) throws FaultMessage {
     LOG.info("Executing operation renewSubscriptions");
     System.out.println(parameter);
+
+    List<SubscriptionRenewal> renewals = new ArrayList<>();
+    XMLGregorianCalendar inOneHour;
+
     try {
-      de.gematik.ws.conn.eventservice.v7.RenewSubscriptionsResponse _return = null;
-      return _return;
-    } catch (java.lang.Exception ex) {
+      inOneHour = getTimeInOneHour();
+    } catch (DatatypeConfigurationException ex) {
       ex.printStackTrace();
-      throw new RuntimeException(ex);
+      throw new FaultMessage(ex.getMessage());
     }
-    // throw new FaultMessage("FaultMessage...");
+
+    for (String id : parameter.getSubscriptionID()) {
+      var subscription =
+          getSubscriptions().stream()
+              .filter(subscriptionType -> subscriptionType.getSubscriptionID().equals(id))
+              .findFirst();
+
+      if (subscription.isEmpty()) {
+        continue;
+      }
+
+      subscription.get().setTerminationTime(inOneHour);
+
+      var renewal = new SubscriptionRenewal();
+      renewal.setSubscriptionID(id);
+      renewal.setTerminationTime(inOneHour);
+      renewals.add(renewal);
+    }
+
+    var response = new RenewSubscriptionsResponse();
+    var subscribeRenewals = new RenewSubscriptionsResponse.SubscribeRenewals();
+    response.setSubscribeRenewals(subscribeRenewals);
+    response.getSubscribeRenewals().getSubscriptionRenewal().addAll(renewals);
+    var status = new Status();
+    status.setResult("OK");
+    response.setStatus(status);
+
+    return response;
   }
 
   /* (non-Javadoc)
@@ -318,5 +347,12 @@ public class EventServicePortImpl implements EventServicePortType {
     } catch (InvalidNameException | IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private XMLGregorianCalendar getTimeInOneHour() throws DatatypeConfigurationException {
+    return DatatypeFactory.newInstance()
+        .newXMLGregorianCalendar(
+            GregorianCalendar.from(
+                Instant.now().plus(20, ChronoUnit.MINUTES).atZone(ZoneOffset.UTC)));
   }
 }
