@@ -68,6 +68,7 @@ public class EventServicePortImpl implements EventServicePortType {
   public de.gematik.ws.conn.eventservice.v7.SubscribeResponse subscribe(
       de.gematik.ws.conn.eventservice.v7.Subscribe parameter) throws FaultMessage {
 
+    var tlsCertCn = getTlsCertCN();
     try {
       LOG.info("Executing operation subscribe");
       var exisitingSubscription =
@@ -80,7 +81,7 @@ public class EventServicePortImpl implements EventServicePortType {
                           || sub.getTopic().equals(parameter.getSubscription().getTopic()))
                       && (sub.getFilter() == null
                           || sub.getFilter().equals(parameter.getSubscription().getFilter())));
-      if (exisitingSubscription.isPresent()) {
+      if (exisitingSubscription.isEmpty()) {
         var newSubscriptionId = UUID.randomUUID().toString();
 
         Log.warn(
@@ -97,7 +98,7 @@ public class EventServicePortImpl implements EventServicePortType {
         parameter
             .getSubscription()
             .setTerminationTime(parameter.getSubscription().getTerminationTime());
-        subscriptions.add(parameter.getSubscription());
+        subscriptions.addSubscription(tlsCertCn, parameter.getSubscription());
       }
       de.gematik.ws.conn.eventservice.v7.SubscribeResponse _return = new SubscribeResponse();
       _return.setStatus(new Status());
@@ -347,7 +348,6 @@ public class EventServicePortImpl implements EventServicePortType {
   private XMLGregorianCalendar getTimeInOneHour() throws DatatypeConfigurationException {
     return DatatypeFactory.newInstance()
         .newXMLGregorianCalendar(
-            GregorianCalendar.from(
-                Instant.now().plus(20, ChronoUnit.MINUTES).atZone(ZoneOffset.UTC)));
+            GregorianCalendar.from(Instant.now().plus(1, ChronoUnit.HOURS).atZone(ZoneOffset.UTC)));
   }
 }
