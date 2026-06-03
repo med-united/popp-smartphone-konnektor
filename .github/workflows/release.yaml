@@ -24,11 +24,6 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      - name: Print OIDC token claims
-        run: |
-          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
-          echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq .
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,5 +37,5 @@ jobs:
       - name: Build and push
         run: |
           mvn package -pl '!systemtests' -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
-          docker tag uhp/popp-smartphone-konnektor:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
+          docker tag uhp/popp-smartphone-konnektor:latest 65415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
           docker push 65415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
