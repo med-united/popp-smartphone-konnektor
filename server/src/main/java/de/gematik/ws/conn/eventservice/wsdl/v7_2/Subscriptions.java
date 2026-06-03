@@ -17,13 +17,18 @@ import java.util.function.Predicate;
 @ApplicationScoped
 public class Subscriptions {
 
-  @Inject private MeterRegistry registry;
+  private final MeterRegistry registry;
+
+  @Inject
+  public Subscriptions(MeterRegistry registry) {
+    this.registry = registry;
+  }
 
   @PostConstruct
   private void init() {
 
-    Gauge.builder("jvm.threads.peak", this, Subscriptions::subscriptionCount)
-        .description("The peak live thread count...") // optional
+    Gauge.builder("uhp.subscriptions.count", this, Subscriptions::subscriptionCount)
+        .description("Number of Subscriptions") // optional
         .tags("key", "value") // optional
         .register(registry);
   }
