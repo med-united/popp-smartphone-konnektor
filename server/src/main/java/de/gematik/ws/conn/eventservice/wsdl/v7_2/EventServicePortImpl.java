@@ -27,7 +27,6 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -69,19 +68,20 @@ public class EventServicePortImpl implements EventServicePortType {
   public de.gematik.ws.conn.eventservice.v7.SubscribeResponse subscribe(
       de.gematik.ws.conn.eventservice.v7.Subscribe parameter) throws FaultMessage {
 
+    var tlsCertCn = getTlsCertCN();
     try {
       LOG.info("Executing operation subscribe");
-
-      List<SubscriptionType> subscriptions = getSubscriptions();
-      if (!subscriptions.stream()
-          .anyMatch(
+      var exisitingSubscription =
+          subscriptions.findSubscription(
+              getTlsCertCN(),
               sub ->
                   (sub.getEventTo() == null
                           || sub.getEventTo().equals(parameter.getSubscription().getEventTo()))
                       && (sub.getTopic() == null
                           || sub.getTopic().equals(parameter.getSubscription().getTopic()))
                       && (sub.getFilter() == null
-                          || sub.getFilter().equals(parameter.getSubscription().getFilter())))) {
+                          || sub.getFilter().equals(parameter.getSubscription().getFilter())));
+      if (exisitingSubscription.isEmpty()) {
         var newSubscriptionId = UUID.randomUUID().toString();
 
         Log.warn(
@@ -98,7 +98,7 @@ public class EventServicePortImpl implements EventServicePortType {
         parameter
             .getSubscription()
             .setTerminationTime(parameter.getSubscription().getTerminationTime());
-        subscriptions.add(parameter.getSubscription());
+        subscriptions.addSubscription(tlsCertCn, parameter.getSubscription());
       }
       de.gematik.ws.conn.eventservice.v7.SubscribeResponse _return = new SubscribeResponse();
       _return.setStatus(new Status());
@@ -117,14 +117,7 @@ public class EventServicePortImpl implements EventServicePortType {
     String cardHandle = getSMCBCardHandle();
     LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
 
-    List<SubscriptionType> subscriptionTypes =
-        subscriptions.getTlsCertCN2subscriptions().get(tlsCertCN);
-
-    if (subscriptionTypes == null) {
-      subscriptionTypes = new CopyOnWriteArrayList<>();
-
-      subscriptions.getTlsCertCN2subscriptions().put(tlsCertCN, subscriptionTypes);
-    }
+    List<SubscriptionType> subscriptionTypes = subscriptions.getSubscriptions(tlsCertCN);
 
     // purge terminated subscriptions
     try {
@@ -132,8 +125,11 @@ public class EventServicePortImpl implements EventServicePortType {
           DatatypeFactory.newInstance()
               .newXMLGregorianCalendar(
                   GregorianCalendar.from(Instant.now().atZone(ZoneOffset.UTC)));
-      subscriptionTypes.removeIf(
-          t -> t.getTerminationTime().compare(now) == DatatypeConstants.LESSER);
+
+      subscriptions.removeSubscription(
+          tlsCertCN,
+          (subscription) ->
+              subscription.getTerminationTime().compare(now) == DatatypeConstants.LESSER);
 
     } catch (DatatypeConfigurationException e) {
       throw new RuntimeException(e);
@@ -352,7 +348,6 @@ public class EventServicePortImpl implements EventServicePortType {
   private XMLGregorianCalendar getTimeInOneHour() throws DatatypeConfigurationException {
     return DatatypeFactory.newInstance()
         .newXMLGregorianCalendar(
-            GregorianCalendar.from(
-                Instant.now().plus(20, ChronoUnit.MINUTES).atZone(ZoneOffset.UTC)));
+            GregorianCalendar.from(Instant.now().plus(1, ChronoUnit.HOURS).atZone(ZoneOffset.UTC)));
   }
 }

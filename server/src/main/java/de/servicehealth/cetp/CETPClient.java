@@ -44,10 +44,10 @@ public class CETPClient {
     String tlsCertCN = cardInserted.getTlsCertCN();
     CardInfoType cardInfoType = cardInserted.getCardType();
 
-    if (subscriptions.getTlsCertCN2subscriptions().containsKey(tlsCertCN)) {
+    if (!subscriptions.getSubscriptions(tlsCertCN).isEmpty()) {
       LOG.info("There are subscriptions for tlsCertCN: " + tlsCertCN);
       // Further processing based on subscriptions
-      for (var subscription : subscriptions.getTlsCertCN2subscriptions().get(tlsCertCN)) {
+      for (var subscription : subscriptions.getSubscriptions(tlsCertCN)) {
         LOG.info("Processing subscription: " + subscription);
         Event event = new Event();
         event.setTopic("CARD/INSERTED");
