@@ -29,11 +29,11 @@ jobs:
           TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
           echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq .
-          
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::765415433338:role/ecr-push-role
+          role-to-assume: arn:aws:iam::765415433338:role/uhp-ecr-push-role
           aws-region: eu-central-1
 
       - name: Login to ECR
