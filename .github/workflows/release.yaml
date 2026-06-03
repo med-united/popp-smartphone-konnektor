@@ -41,6 +41,6 @@ jobs:
 
       - name: Build and push
         run: |
-          mvn package -pl server -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
+          mvn package -pl '!systemtests' -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
           docker tag uhp/popp-smartphone-konnektor:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
           docker push 65415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
