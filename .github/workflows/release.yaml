@@ -11,6 +11,9 @@ on:
 
 jobs:
   push:
+    permissions:
+      id-token: write   # required — lets the workflow request the OIDC token
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +24,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-          
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
