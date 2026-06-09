@@ -44,7 +44,7 @@ public class MetricsRegistry {
   }
 
   @PostConstruct
-  private void init() {
+  void init() {
     for (Counters counter : Counters.values()) {
       var micrometerCounter = Counter.builder(counter.getName()).register(meterRegistry);
       counter.setCounter(micrometerCounter);

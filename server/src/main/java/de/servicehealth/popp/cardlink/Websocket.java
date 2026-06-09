@@ -1,7 +1,6 @@
 package de.servicehealth.popp.cardlink;
 
 import de.gematik.ws.conn.cardservice.wsdl.v8_2.NewAPDUForSession;
-import de.gematik.ws.conn.observability.MetricsRegistry;
 import de.gematik.ws.conn.observability.MetricsRegistry.Counters;
 import de.servicehealth.popp.session.Store;
 import de.servicehealth.popp.session.WebsocketEntry;
@@ -27,21 +26,21 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 @ServerEndpoint("/websocket/{tlsCertCN}")
 public class Websocket {
 
   private final Store store;
-  private final MetricsRegistry metricsRegistry;
 
   @Inject
-  public Websocket(Store store, MetricsRegistry metricsRegistry) {
+  @SuppressWarnings("unused")
+  public Websocket(Store store) {
     this.store = store;
-    this.metricsRegistry = metricsRegistry;
   }
 
   private enum MessageTypes {
-    REGISTER_EGK("registerEgk"),
+    REGISTER_EGK("registerEGK"),
     SEND_APDU_RESPONSE("sendAPDUResponse"),
     EREZEPT_TOKENS("eRezeptTokensFromAVS"),
     EREZEPT_BUNDLES("eRezeptBundlesFromAVS");
@@ -56,6 +55,7 @@ public class Websocket {
       return type;
     }
 
+    @Nullable
     public static MessageTypes fromType(String name) {
       return Arrays.stream(MessageTypes.values())
           .filter(type -> type.getType().equals(name))
@@ -77,6 +77,7 @@ public class Websocket {
 
   @OnOpen
   public void onOpen(Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
+    Counters.WEBSOCKETS_OPENED.increment();
     // Handle new connection
     LOG.info("WebSocket opened for tlsCertCN: " + tlsCertCN);
     // Add session to store
@@ -87,6 +88,7 @@ public class Websocket {
   }
 
   @OnMessage
+  @SuppressWarnings("unused")
   public void refactoredOnMessage(
       String message, Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
 
@@ -104,99 +106,6 @@ public class Websocket {
     }
   }
 
-  @OnMessage
-  public void onMessage(
-      String message, Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
-    // Handle incoming message
-    LOG.fine("Received message from " + tlsCertCN + ": " + message);
-    // Echo the message back
-    try {
-      JsonStructure jsonStructure =
-          Json.createReader(new ByteArrayInputStream(message.getBytes())).read();
-      if (!(jsonStructure instanceof JsonArray)) {
-        LOG.warning(
-            "Received JSON is not an array but is: "
-                + (jsonStructure == null ? "null" : jsonStructure.getClass().getName()));
-        return;
-      }
-      JsonArray jsonArray = (JsonArray) jsonStructure;
-      if (jsonArray.size() < 1) {
-        LOG.warning("Received JSON array is empty");
-        return;
-      }
-      if (jsonArray.size() < 2) {
-        LOG.warning("Received JSON array has no cardSessionId");
-        return;
-      }
-      JsonObject jsonObject = jsonArray.getJsonObject(0);
-      String cardSessionId; // cardSessionId
-      try {
-        cardSessionId = jsonArray.getString(1);
-      } catch (Exception e) {
-        cardSessionId = "";
-      }
-      String correlationId = null;
-      if (jsonArray.size() < 3) {
-        LOG.warning("Received JSON array has no correlationId");
-      } else {
-        correlationId = jsonArray.getString(2); // correlationId
-        LOG.fine("Correlation ID: " + correlationId);
-      }
-
-      if (jsonObject.containsKey("type")) {
-        String type = jsonObject.getString("type");
-        LOG.info("Message type: " + type);
-        if (type.equals("registerEGK")) {
-          // Handle registerEGK message
-          store.registerEGK(
-              tlsCertCN,
-              webSocketSession,
-              parseEGKPayload(Base64.getDecoder().decode(jsonObject.getString("payload"))),
-              cardSessionId);
-        } else if (type.equals("sendAPDUResponse")) {
-          // Handle sendAPDUResponse message
-          Optional<WebsocketEntry> entry = store.findEntry(tlsCertCN, cardSessionId);
-          if (entry.isPresent()) {
-            if (correlationId != null) {
-              LOG.fine("Completing future for correlationId: " + correlationId);
-              byte[] decodedPayload = Base64.getDecoder().decode(jsonObject.getString("payload"));
-              JsonObject sendAPDUResponse =
-                  Json.createReader(new ByteArrayInputStream(decodedPayload)).readObject();
-
-              String response = sendAPDUResponse.getString("response");
-
-              String hex = HexFormat.of().formatHex(Base64.getDecoder().decode(response));
-              LOG.fine("Decoded APDU response hex: " + hex);
-
-              entry.get().completeApduResponse(correlationId, hex);
-            } else {
-              LOG.warning("No correlationId provided for sendAPDUResponse");
-            }
-          } else {
-            LOG.warning(
-                "No entry found for tlsCertCN and cardSessionId: "
-                    + tlsCertCN
-                    + ", "
-                    + cardSessionId);
-          }
-        } else if (type.equals("eRezeptTokensFromAVS") || type.equals("eRezeptBundlesFromAVS")) {
-          var payload =
-              parseEGKPayload(Base64.getDecoder().decode(jsonObject.getString("payload")));
-
-          var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
-          Log.info("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
-          Optional<WebsocketEntry> entry = store.findEntry(ctId);
-          entry.ifPresent(websocketEntry -> websocketEntry.sendText(message));
-        }
-      } else {
-        LOG.fine("No type field in message");
-      }
-      // webSocketSession.getBasicRemote().sendText("Echo from " + tlsCertCN + ": " + message);
-    } catch (Exception e) {
-      LOG.log(Level.SEVERE, "Error sending message: " + e.getMessage(), e);
-    }
-  }
-
   private JsonObject parseEGKPayload(byte[] payloadBytes) {
     try {
       return Json.createReader(new ByteArrayInputStream(payloadBytes)).readObject();
@@ -208,6 +117,7 @@ public class Websocket {
 
   @OnClose
   public void onClose(Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
+    Counters.WEBSOCKETS_CLOSED.increment();
     store.removeEntryBySessionId(webSocketSession.getId());
     LOG.info("WebSocket closed for tlsCertCN: " + tlsCertCN);
   }
@@ -259,6 +169,7 @@ public class Websocket {
   }
 
   private void handleErezept(WebsocketMessage websocketMessage) {
+    Counters.PRESCRIPTIONS_RETURNED.increment();
     var payload = parseEGKPayload(Base64.getDecoder().decode(websocketMessage.payload()));
 
     var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
@@ -327,9 +238,8 @@ public class Websocket {
     }
 
     var messageType = MessageTypes.fromType(type);
-
     if (Objects.isNull(messageType)) {
-      LOG.warning("Received JSON object's message type is unknown");
+      return Optional.empty();
     }
 
     String payload;
@@ -347,7 +257,7 @@ public class Websocket {
             cardSessionId,
             webSocketSession,
             payload,
-            tlsCertCN,
-            correlationId));
+            correlationId,
+            tlsCertCN));
   }
 }
