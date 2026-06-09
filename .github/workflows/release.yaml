@@ -11,6 +11,9 @@ on:
 
 jobs:
   push:
+    permissions:
+      id-token: write   # required — lets the workflow request the OIDC token
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +24,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-          
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::765415433338:role/ecr-push-role
+          role-to-assume: arn:aws:iam::765415433338:role/uhp-ecr-push-role
           aws-region: eu-central-1
 
       - name: Login to ECR
@@ -33,6 +36,6 @@ jobs:
 
       - name: Build and push
         run: |
-          mvn package -pl server -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
+          mvn package -pl '!systemtests' -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
           docker tag uhp/popp-smartphone-konnektor:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
-          docker push 65415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
+          docker push 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
