@@ -1,6 +1,7 @@
 package de.servicehealth.popp.cardlink;
 
 import de.gematik.ws.conn.cardservice.wsdl.v8_2.NewAPDUForSession;
+import de.gematik.ws.conn.observability.MetricsRegistry.Counters;
 import de.servicehealth.popp.session.Store;
 import de.servicehealth.popp.session.WebsocketEntry;
 import io.quarkus.logging.Log;
@@ -8,6 +9,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
+import jakarta.json.JsonException;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonStructure;
 import jakarta.websocket.OnClose;
@@ -17,21 +19,65 @@ import jakarta.websocket.Session;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import java.io.ByteArrayInputStream;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 @ServerEndpoint("/websocket/{tlsCertCN}")
 public class Websocket {
 
-  private static final Logger LOG = Logger.getLogger(Websocket.class.getName());
+  private final Store store;
 
-  @Inject private Store store;
+  @Inject
+  @SuppressWarnings("unused")
+  public Websocket(Store store) {
+    this.store = store;
+  }
+
+  private enum MessageTypes {
+    REGISTER_EGK("registerEGK"),
+    SEND_APDU_RESPONSE("sendAPDUResponse"),
+    EREZEPT_TOKENS("eRezeptTokensFromAVS"),
+    EREZEPT_BUNDLES("eRezeptBundlesFromAVS");
+
+    private final String type;
+
+    MessageTypes(String type) {
+      this.type = type;
+    }
+
+    public String getType() {
+      return type;
+    }
+
+    @Nullable
+    public static MessageTypes fromType(String name) {
+      return Arrays.stream(MessageTypes.values())
+          .filter(type -> type.getType().equals(name))
+          .findFirst()
+          .orElse(null);
+    }
+  }
+
+  private record WebsocketMessage(
+      MessageTypes type,
+      String message,
+      String cardSessionId,
+      Session websocketSession,
+      String payload,
+      String correlationId,
+      String tlsCertCn) {}
+
+  private static final Logger LOG = Logger.getLogger(Websocket.class.getName());
 
   @OnOpen
   public void onOpen(Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
+    Counters.WEBSOCKETS_OPENED.increment();
     // Handle new connection
     LOG.info("WebSocket opened for tlsCertCN: " + tlsCertCN);
     // Add session to store
@@ -42,97 +88,21 @@ public class Websocket {
   }
 
   @OnMessage
-  public void onMessage(
+  @SuppressWarnings("unused")
+  public void refactoredOnMessage(
       String message, Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
-    // Handle incoming message
-    LOG.fine("Received message from " + tlsCertCN + ": " + message);
-    // Echo the message back
-    try {
-      JsonStructure jsonStructure =
-          Json.createReader(new ByteArrayInputStream(message.getBytes())).read();
-      if (!(jsonStructure instanceof JsonArray)) {
-        LOG.warning(
-            "Received JSON is not an array but is: "
-                + (jsonStructure == null ? "null" : jsonStructure.getClass().getName()));
-        return;
-      }
-      JsonArray jsonArray = (JsonArray) jsonStructure;
-      if (jsonArray.size() < 1) {
-        LOG.warning("Received JSON array is empty");
-        return;
-      }
-      if (jsonArray.size() < 2) {
-        LOG.warning("Received JSON array has no cardSessionId");
-        return;
-      }
-      JsonObject jsonObject = jsonArray.getJsonObject(0);
-      String cardSessionId; // cardSessionId
-      try {
-        cardSessionId = jsonArray.getString(1);
-      } catch (Exception e) {
-        cardSessionId = "";
-      }
-      String correlationId = null;
-      if (jsonArray.size() < 3) {
-        LOG.warning("Received JSON array has no correlationId");
-      } else {
-        correlationId = jsonArray.getString(2); // correlationId
-        LOG.fine("Correlation ID: " + correlationId);
-      }
 
-      if (jsonObject.containsKey("type")) {
-        String type = jsonObject.getString("type");
-        LOG.info("Message type: " + type);
-        // [{"type": "registerEGK", "payload":
-        // "eyJjYXJkU2Vzc2lvbklkIjoiNTM3ZTdlYjctODJjZC00YWYwLTkwZjItM2U1MTQxMDlmNTQyIiwiZ2RvIjoiV2dxQUoyaURFUUFBRldFViIsImF0ciI6IjRCRUNBZ2dKQWdNQWdBSUNBZ2dKQWdJSUNWOVNESUJtQlVSRlNVUk5jNVloODlBREJBWUEwaEJFUlVsR1dGTk1Rek15UjBSQkJBQUEweEJFUlVsRVRVMUlRMGRmUnpJeUFnSUcxQkJFUlVsRVRVVklRMTg1TURBd0F3QUYxaEJFUlVsRVRWQldWbFkxTGpBd0FRQUF6eFhQejgvUHo4L1B6OC9QejgvUHo4L1B6OC9Qejg4PSIsImNhcmRWZXJzaW9uIjoiN3l2QUF3SUFBTUVEQkFVQ3doQkVSVWxFVFVWSVExODVNREF3QXdBRnhBTUJBQURGQXdJQUFNY0RBUUFBIiwieDUwOUF1dGhSU0EiOiJNSUlFOWpDQ0E5NmdBd0lCQWdJSEExem9VaERNUURBTkJna3Foa2lHOXcwQkFRc0ZBRENCbGpFTE1Ba0dBMVVFQmhNQ1JFVXhIekFkQmdOVkJBb01GbWRsYldGMGFXc2dSMjFpU0NCT1QxUXRWa0ZNU1VReFJUQkRCZ05WQkFzTVBFVnNaV3QwY205dWFYTmphR1VnUjJWemRXNWthR1ZwZEhOcllYSjBaUzFEUVNCa1pYSWdWR1ZzWlcxaGRHbHJhVzVtY21GemRISjFhM1IxY2pFZk1CMEdBMVVFQXd3V1IwVk5Ma1ZIU3kxRFFUUXhJRlJGVTFRdFQwNU1XVEFlRncweU5EQTBNREl3TURBd01EQmFGdzB5T1RBME1ERXlNelU1TlRsYU1JSHRNUXN3Q1FZRFZRUUdFd0pFUlRFZE1Cc0dBMVVFQ2d3VVZHVnpkQ0JIUzFZdFUxWk9UMVF0VmtGTVNVUXhFakFRQmdOVkJBc01DVEV3T1RVd01EazJPVEVUTUJFR0ExVUVDd3dLV0RFeE1EVTJOemsxTlRFVE1CRUdBMVVFQkF3S1ZHRnVaMlZ5dzdCaGJERThNRG9HQTFVRUtnd3pRVzV1YVd0aElGWmxjbUVnVFdWc2FYTnpZU0JDY25WdWFHbHNaQ0JCY0doeWIyUnBkR1VnUm5KbGFXWnlZWFVnZG05dU1VTXdRUVlEVlFRREREcEJibTVwYTJFZ1ZtVnlZU0JOWld4cGMzTmhJRUl1SUVFdUlFWnlaV2xtY21GMUlIWnZiaUJVWVc1blpYTERzR0ZzVkVWVFZDMVBUa3haTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF6eGR6N2svSGtKa0hYWm9oeldiKzZWVDJvNVRXai9kM0R0Ynd3bU4zYWJqeEtsZDJpeTZzL0UrSEhVQUZyRHBXR2pxUSs3a3d5QXQvTWp1aEE2aElxVW9RaHU3MThLRnFPaHZpT2FMMGpQalJJc2s2Ky8ydFljc2xPbmNSd29XWXkwVzhuZTVlWW90bTk0YW1YM0JJVFpvTTRnS1k4cnNsSjNLbTlQMDZxNTd5RjFUaFdCY0F6UzJtOXFrUDFzbmZtYmE5OG1CQjQzTktCV1hCN3NLRGxGcjZXV3VNNmhEVjVYdzQrU1JJdTA0UE1iekxmakRtKzIzWFdOTmticFdHMk9sbUd0d0l3RWlLSTBDZHVaKzVqTTFYckJBYkNxQWxlblpueDErWEx1cWJnMGNvTHRTZW5CQnc0Y3pLZ0U5bE5TSUVxdHpGRGtjdWNMS25TSXYxWFFJREFRQUJvNEh2TUlIc01BNEdBMVVkRHdFQi93UUVBd0lIZ0RBNEJnZ3JCZ0VGQlFjQkFRUXNNQ293S0FZSUt3WUJCUVVITUFHR0hHaDBkSEE2THk5bGFHTmhMbWRsYldGMGFXc3VaR1V2YjJOemNDOHdId1lEVlIwakJCZ3dGb0FVR04xMThDRjRMWVk4QzVvYWZWdEExbGlKOWhZd0hRWURWUjBPQkJZRUZGVmozZU1jS2hlb1BYY21YUFYxcUoxek9WaE5NQ0FHQTFVZElBUVpNQmN3Q2dZSUtvSVVBRXdFZ1NNd0NRWUhLb0lVQUV3RVJqQXdCZ1VySkFnREF3UW5NQ1V3SXpBaE1COHdIVEFRREE1V1pYSnphV05vWlhKMFpTOHRjakFKQmdjcWdoUUFUQVF4TUF3R0ExVWRFd0VCL3dRQ01BQXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBTWJOWnJaWlcvSWtIcHBFOUxsRWt4ckNVNS9kY1F3K2tGQ2xNUDBTZUhBaCs2M3dSZWo4VU5yOG9QSmJ6aUZsYVRWWE5yaWprenQ2VUd6RGxhMVJBMDJ4SHVHMlpPdGw5d2lqWVE1aUJuTG5FNlBwTDdlVnBlNVhqNVdId1NpY25TMFVJL3FyYkQ1aVAwVFowSStBcUlGT1hIL1h1citJU2hvbXZnL25wanF6YUs0dWg1SkExcTVBYVQrcU5YNk15MmlzT3RRR24zWUhmVnZzdkpwNzZLcEp2elk4bjcvenNweTBqUkNxVVRJQ0N4NjZoUFAwWlZsc2RQdWFPSFV2TkxwMllTbzU0QVJhVU9ScVlvSFl4eFptcjV2RkxrcjRmUTBNdkNpMW5yNWUwMk10bFRtZnZQTHVPaGZPVmlnNTdpOXBwbE8zaHgrY2JjYjR3UkU5cDVRPSIsIng1MDlBdXRoRUNDIjoiTUlJRGJqQ0NBeFNnQXdJQkFnSUhBdjhDcGJDckVqQUtCZ2dxaGtqT1BRUURBakNCbGpFTE1Ba0dBMVVFQmhNQ1JFVXhIekFkQmdOVkJBb01GbWRsYldGMGFXc2dSMjFpU0NCT1QxUXRWa0ZNU1VReFJUQkRCZ05WQkFzTVBFVnNaV3QwY205dWFYTmphR1VnUjJWemRXNWthR1ZwZEhOcllYSjBaUzFEUVNCa1pYSWdWR1ZzWlcxaGRHbHJhVzVtY21GemRISjFhM1IxY2pFZk1CMEdBMVVFQXd3V1IwVk5Ma1ZIU3kxRFFUVXhJRlJGVTFRdFQwNU1XVEFlRncweU5EQTBNREl3TURBd01EQmFGdzB5T1RBME1ERXlNelU1TlRsYU1JSHRNUXN3Q1FZRFZRUUdFd0pFUlRFZE1Cc0dBMVVFQ2d3VVZHVnpkQ0JIUzFZdFUxWk9UMVF0VmtGTVNVUXhFakFRQmdOVkJBc01DVEV3T1RVd01EazJPVEVUTUJFR0ExVUVDd3dLV0RFeE1EVTJOemsxTlRFVE1CRUdBMVVFQkF3S1ZHRnVaMlZ5dzdCaGJERThNRG9HQTFVRUtnd3pRVzV1YVd0aElGWmxjbUVnVFdWc2FYTnpZU0JDY25WdWFHbHNaQ0JCY0doeWIyUnBkR1VnUm5KbGFXWnlZWFVnZG05dU1VTXdRUVlEVlFRREREcEJibTVwYTJFZ1ZtVnlZU0JOWld4cGMzTmhJRUl1SUVFdUlFWnlaV2xtY21GMUlIWnZiaUJVWVc1blpYTERzR0ZzVkVWVFZDMVBUa3haTUZvd0ZBWUhLb1pJemowQ0FRWUpLeVFEQXdJSUFRRUhBMElBQkkxQ0lORHZkQ3NWbXprUks3VWovb3VsVS81Q0svd1d3STBvUzZOSVMyKzlrL0tGVUthVkhRbW1VS2JES1dzNWFNemxCY1IvZDBybndJR2F1b0x3WnZpamdmSXdnZTh3T3dZSUt3WUJCUVVIQVFFRUx6QXRNQ3NHQ0NzR0FRVUZCekFCaGg5b2RIUndPaTh2WldoallTNW5aVzFoZEdsckxtUmxMMlZqWXkxdlkzTndNQ0FHQTFVZElBUVpNQmN3Q2dZSUtvSVVBRXdFZ1NNd0NRWUhLb0lVQUV3RVJqQXdCZ1VySkFnREF3UW5NQ1V3SXpBaE1COHdIVEFRREE1V1pYSnphV05vWlhKMFpTOHRjakFKQmdjcWdoUUFUQVF4TUE0R0ExVWREd0VCL3dRRUF3SUhnREFNQmdOVkhSTUJBZjhFQWpBQU1COEdBMVVkSXdRWU1CYUFGSFRwK1JTRDRRdm1FZllxckpmczJhK1pROEh3TUIwR0ExVWREZ1FXQkJSZGJRTzk5K0UvTi8zUWR1dXVRUHdXTVl5cWZ6QUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpRUFxSXJwZE4yeU43Rzl6R3pMVjk5emdvcHA2OWpianNwKzdoTlNVa29QSmhJQ0lGV3hJYlB4TlN2NmtzVWVSSjdzZ2RzZTFLRGR5ZUZLaEhRem1NeVF0UThZIiwiY3ZjQXV0aCI6ImZ5R0IybjlPZ1pOZktRRndRZ2hFUlVkWVdCRUNJMzlKU3dZR0t5UURCUU1CaGtFRU9nckFtYjhkc256WGYveHlmODhZOU1VSFhpdWVVd0FPQ3Eyb2pTTUJla1o3YkthUElqSnpPN1hJNWxUOUh3bmt4K0ZJWU9FUlZoVVZIZkpOSDRxNXAxOGdEQUFKZ0Nkb2d4RUFBQlZoRlg5TUV3WUlLb0lVQUV3RWdSaFRCd0FBQUFBQUFBQmZKUVlDQkFBRUFBSmZKQVlDQ1FBRUFBRmZOMEFoa20rVDJWTitaVzQ0V2FuTmc4MHFraVBqejNMYkZrUkRNYkF4RlVIb09xVTFaY2p2ZEpTUFhFazRaY2FxbXJtTEJYSGdJQnlGUUU0NURQMlNINTJkIiwiY3ZjQ0EiOiJmeUdCMkg5T2daRmZLUUZ3UWdoRVJVZFlXSWNDSW45SlRRWUlLb1pJemowRUF3S0dRUVFvUUZvTXpGeFR0bmdEVnFVVUhyUi83VjlXdmtTOEl2SUViOEJUL3R2Q1hsRGlTbTFxK1Z3Yy91bEplc3pqV2FKVDk5QzNxNjZsMGFZdDREQVVYd3lYWHlBSVJFVkhXRmdSQWlOL1RCTUdDQ3FDRkFCTUJJRVlVd2VBQUFBQUFBQUFYeVVHQWdNQUJ3TUJYeVFHQXdFQUJ3TUFYemRBVE5KZ3dJQTdFbG9BRzZnYnFmTGlzVGtONVBGR2tjZ2lvb3pIZHFHRzE3cC9DSEJNSi8zTnJySDRza09qZVhiUE43OThFaGhZMFBCQm5lZ3lGNk9WM2c9PSIsImNsaWVudCI6IkNPTSJ9"}, "537e7eb7-82cd-4af0-90f2-3e514109f542", "7956ec67-a28b-4265-ad26-2645e7458095"]
-        if (type.equals("registerEGK")) {
-          // Handle registerEGK message
-          store.registerEGK(
-              tlsCertCN,
-              webSocketSession,
-              parseEGKPayload(Base64.getDecoder().decode(jsonObject.getString("payload"))),
-              cardSessionId);
-        } else if (type.equals("sendAPDUResponse")) {
-          // Handle sendAPDUResponse message
-          Optional<WebsocketEntry> entry = store.findEntry(tlsCertCN, cardSessionId);
-          if (entry.isPresent()) {
-            if (correlationId != null) {
-              LOG.fine("Completing future for correlationId: " + correlationId);
-              byte[] decodedPayload = Base64.getDecoder().decode(jsonObject.getString("payload"));
-              JsonObject sendAPDUResponse =
-                  Json.createReader(new ByteArrayInputStream(decodedPayload)).readObject();
+    var websocketMessageOpt = extractWebsocketMessage(message, webSocketSession, tlsCertCN);
 
-              String response = sendAPDUResponse.getString("response");
+    if (websocketMessageOpt.isEmpty()) {
+      return;
+    }
 
-              String hex = HexFormat.of().formatHex(Base64.getDecoder().decode(response));
-              LOG.fine("Decoded APDU response hex: " + hex);
-
-              entry.get().completeApduResponse(correlationId, hex);
-            } else {
-              LOG.warning("No correlationId provided for sendAPDUResponse");
-            }
-          } else {
-            LOG.warning(
-                "No entry found for tlsCertCN and cardSessionId: "
-                    + tlsCertCN
-                    + ", "
-                    + cardSessionId);
-          }
-        } else if (type.equals("eRezeptTokensFromAVS") || type.equals("eRezeptBundlesFromAVS")) {
-          var payload =
-              parseEGKPayload(Base64.getDecoder().decode(jsonObject.getString("payload")));
-
-          var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
-          Log.info("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
-          Optional<WebsocketEntry> entry = store.findEntry(ctId);
-          entry.ifPresent(websocketEntry -> websocketEntry.sendText(message));
-        }
-      } else {
-        LOG.fine("No type field in message");
-      }
-      // webSocketSession.getBasicRemote().sendText("Echo from " + tlsCertCN + ": " + message);
-    } catch (Exception e) {
-      LOG.log(Level.SEVERE, "Error sending message: " + e.getMessage(), e);
+    var websocketMessage = websocketMessageOpt.get();
+    switch (websocketMessage.type) {
+      case REGISTER_EGK -> handleRegisterEgk(websocketMessage);
+      case SEND_APDU_RESPONSE -> handleSendApduResponse(websocketMessage);
+      case EREZEPT_BUNDLES, EREZEPT_TOKENS -> handleErezept(websocketMessage);
     }
   }
 
@@ -147,15 +117,147 @@ public class Websocket {
 
   @OnClose
   public void onClose(Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
-    // Remove session from store
+    Counters.WEBSOCKETS_CLOSED.increment();
     store.removeEntryBySessionId(webSocketSession.getId());
-    // Handle connection close
     LOG.info("WebSocket closed for tlsCertCN: " + tlsCertCN);
   }
 
   public void onNewAPDUForSession(@Observes NewAPDUForSession event) {
-
     WebsocketEntry entry = store.findEntry(event.tlsCertCN, event.cardSessionId).orElseThrow();
     entry.startApduSession();
+  }
+
+  private void handleRegisterEgk(WebsocketMessage websocketMessage) {
+    Counters.CARDS_REGISTERED.increment();
+    store.registerEGK(
+        websocketMessage.tlsCertCn(),
+        websocketMessage.websocketSession(),
+        parseEGKPayload(Base64.getDecoder().decode(websocketMessage.payload())),
+        websocketMessage.cardSessionId());
+  }
+
+  private void handleSendApduResponse(WebsocketMessage websocketMessage) {
+
+    Optional<WebsocketEntry> entry =
+        store.findEntry(websocketMessage.tlsCertCn(), websocketMessage.cardSessionId());
+
+    if (entry.isEmpty()) {
+      LOG.warning(
+          "No entry found for tlsCertCN and cardSessionId: "
+              + websocketMessage.tlsCertCn()
+              + ", "
+              + websocketMessage.cardSessionId());
+      return;
+    }
+
+    if (Objects.isNull(websocketMessage.cardSessionId())) {
+      LOG.warning("No correlationId provided for sendAPDUResponse");
+      return;
+    }
+
+    LOG.fine("Completing future for correlationId: " + websocketMessage.correlationId());
+    byte[] decodedPayload = Base64.getDecoder().decode(websocketMessage.payload());
+    JsonObject sendAPDUResponse =
+        Json.createReader(new ByteArrayInputStream(decodedPayload)).readObject();
+
+    String response = sendAPDUResponse.getString("response");
+
+    String hex = HexFormat.of().formatHex(Base64.getDecoder().decode(response));
+    LOG.fine("Decoded APDU response hex: " + hex);
+
+    entry.get().completeApduResponse(websocketMessage.correlationId(), hex);
+  }
+
+  private void handleErezept(WebsocketMessage websocketMessage) {
+    Counters.PRESCRIPTIONS_RETURNED.increment();
+    var payload = parseEGKPayload(Base64.getDecoder().decode(websocketMessage.payload()));
+
+    var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
+    Log.info("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
+    Optional<WebsocketEntry> entry = store.findEntry(ctId);
+    entry.ifPresent(websocketEntry -> websocketEntry.sendText(websocketMessage.message()));
+  }
+
+  private Optional<WebsocketMessage> extractWebsocketMessage(
+      String message, Session webSocketSession, String tlsCertCN) {
+    LOG.fine("Received message from " + tlsCertCN + ": " + message);
+    // Echo the message back
+    JsonObject jsonObject;
+    JsonArray jsonArray;
+    try {
+      JsonStructure jsonStructure =
+          Json.createReader(new ByteArrayInputStream(message.getBytes())).read();
+      if (jsonStructure instanceof JsonArray jsonArrayInner) {
+        try {
+          jsonObject = jsonArrayInner.getJsonObject(0);
+        } catch (IndexOutOfBoundsException | ClassCastException exception) {
+          LOG.warning("Received JSON array does not contain a json Object");
+          return Optional.empty();
+        }
+        jsonArray = jsonArrayInner;
+      } else {
+        LOG.warning("Received JSON is not an array but is: " + jsonStructure.getClass().getName());
+        return Optional.empty();
+      }
+
+    } catch (JsonException | IllegalStateException exception) {
+      LOG.fine("Could not parse websocket Json Message. Dropping message");
+      return Optional.empty();
+    }
+
+    if (jsonArray.isEmpty()) {
+      LOG.warning("Received JSON array is empty");
+      return Optional.empty();
+    }
+    if (jsonArray.size() < 2) {
+      LOG.warning("Received JSON array has no cardSessionId");
+      return Optional.empty();
+    }
+
+    String cardSessionId;
+    try {
+      cardSessionId = jsonArray.getString(1);
+    } catch (Exception e) {
+      cardSessionId = "";
+    }
+
+    String correlationId = null;
+    if (jsonArray.size() < 3) {
+      LOG.warning("Received JSON array has no correlationId");
+    } else {
+      correlationId = jsonArray.getString(2); // correlationId
+      LOG.fine("Correlation ID: " + correlationId);
+    }
+
+    String type;
+    try {
+      type = jsonObject.getString("type");
+    } catch (NullPointerException | ClassCastException exception) {
+      LOG.warning("Received JSON object does not have a type");
+      return Optional.empty();
+    }
+
+    var messageType = MessageTypes.fromType(type);
+    if (Objects.isNull(messageType)) {
+      return Optional.empty();
+    }
+
+    String payload;
+    try {
+      payload = jsonObject.getString("payload");
+    } catch (NullPointerException | ClassCastException exception) {
+      LOG.warning("Received JSON object does not have a payload");
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        new WebsocketMessage(
+            messageType,
+            message,
+            cardSessionId,
+            webSocketSession,
+            payload,
+            correlationId,
+            tlsCertCN));
   }
 }
