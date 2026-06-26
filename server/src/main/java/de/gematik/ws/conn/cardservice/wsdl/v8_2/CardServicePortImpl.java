@@ -15,6 +15,7 @@ import de.gematik.ws.conn.cardservice.v8_2_1.StopCardSessionResponse;
 import de.gematik.ws.conn.cardservice.v8_2_1.UnblockPin;
 import de.gematik.ws.conn.cardservice.v8_2_1.VerifyPin;
 import de.gematik.ws.conn.cardservicecommon.v2.PinResponseType;
+import de.gematik.ws.conn.connectorcommon.v5.Status;
 import de.servicehealth.cardlink.model.SendApduPayload;
 import de.servicehealth.popp.session.ApduScenarioInitilizedEvent;
 import de.servicehealth.popp.session.Store;
@@ -27,10 +28,13 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.json.bind.JsonbBuilder;
+import jakarta.jws.WebService;
 import jakarta.websocket.Session;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.Key;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -38,11 +42,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@jakarta.jws.WebService(
+@WebService(
     serviceName = "CardService",
     portName = "CardServicePort",
     targetNamespace = "http://ws.gematik.de/conn/CardService/WSDL/v8.2",
@@ -125,10 +130,8 @@ public class CardServicePortImpl implements CardServicePortType {
                           try {
                             InputStream is =
                                 new ByteArrayInputStream(Base64.getDecoder().decode(certBase64));
-                            java.security.cert.CertificateFactory cf =
-                                java.security.cert.CertificateFactory.getInstance("X.509");
-                            java.security.cert.X509Certificate cert =
-                                (java.security.cert.X509Certificate) cf.generateCertificate(is);
+                            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                            X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
                             return cert.getPublicKey();
                           } catch (Exception e) {
                             LOG.log(Level.SEVERE, "Failed to parse certificate from x5c", e);
@@ -177,9 +180,7 @@ public class CardServicePortImpl implements CardServicePortType {
     List<String> websocketResponses;
     try {
       websocketResponses =
-          store
-              .getAPDUResponses(backMappedCertCN, sessionId)
-              .get(10000, java.util.concurrent.TimeUnit.MILLISECONDS);
+          store.getAPDUResponses(backMappedCertCN, sessionId).get(10000, TimeUnit.MILLISECONDS);
       LOG.info("Websocket Responses: ");
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
@@ -267,7 +268,7 @@ public class CardServicePortImpl implements CardServicePortType {
     // store.removeEntryBySessionId(parameter.getSessionId());
     // Create and return a StopCardSessionResponse
     StopCardSessionResponse response = new StopCardSessionResponse();
-    response.setStatus(new de.gematik.ws.conn.connectorcommon.v5.Status());
+    response.setStatus(new Status());
     response.getStatus().setResult("OK");
     return response;
   }

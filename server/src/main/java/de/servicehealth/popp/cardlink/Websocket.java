@@ -44,20 +44,17 @@ public class Websocket {
   @OnMessage
   public void onMessage(
       String message, Session webSocketSession, @PathParam("tlsCertCN") String tlsCertCN) {
-    // Handle incoming message
     LOG.fine("Received message from " + tlsCertCN + ": " + message);
-    // Echo the message back
     try {
       JsonStructure jsonStructure =
           Json.createReader(new ByteArrayInputStream(message.getBytes())).read();
-      if (!(jsonStructure instanceof JsonArray)) {
+      if (!(jsonStructure instanceof JsonArray jsonArray)) {
         LOG.warning(
             "Received JSON is not an array but is: "
                 + (jsonStructure == null ? "null" : jsonStructure.getClass().getName()));
         return;
       }
-      JsonArray jsonArray = (JsonArray) jsonStructure;
-      if (jsonArray.size() < 1) {
+      if (jsonArray.isEmpty()) {
         LOG.warning("Received JSON array is empty");
         return;
       }
@@ -154,7 +151,6 @@ public class Websocket {
   }
 
   public void onNewAPDUForSession(@Observes NewAPDUForSession event) {
-
     WebsocketEntry entry = store.findEntry(event.tlsCertCN, event.cardSessionId).orElseThrow();
     entry.startApduSession();
   }
