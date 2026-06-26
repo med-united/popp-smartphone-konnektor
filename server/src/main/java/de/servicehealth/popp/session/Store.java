@@ -4,7 +4,6 @@ import de.servicehealth.event.CardInserted;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
-import jakarta.inject.Inject;
 import jakarta.json.JsonObject;
 import jakarta.websocket.Session;
 import java.util.Collection;
@@ -19,9 +18,14 @@ import java.util.concurrent.Future;
 
 @ApplicationScoped
 public class Store {
+
   private final Map<String, List<WebsocketEntry>> tlsCertCNs2cards = new ConcurrentHashMap<>();
 
-  @Inject Event<CardInserted> cardInsertedEvent;
+   Event<CardInserted> cardInsertedEvent;
+
+  public Store(Event<CardInserted> cardInsertedEvent) {
+    this.cardInsertedEvent = cardInsertedEvent;
+  }
 
   public List<WebsocketEntry> getEntriesOfCertCN(String certCn) {
     return tlsCertCNs2cards.getOrDefault(certCn, Collections.emptyList()).stream()
