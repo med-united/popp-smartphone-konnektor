@@ -29,6 +29,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 @ServerEndpoint("/websocket/{tlsCertCN}")
+@SuppressWarnings("unused")
 public class Websocket {
 
   private final Store store;
@@ -169,9 +170,12 @@ public class Websocket {
   }
 
   private void handleErezept(WebsocketMessage websocketMessage) {
-    Counters.PRESCRIPTIONS_RETURNED.increment();
+    if (websocketMessage.type == MessageTypes.EREZEPT_BUNDLES) {
+      Counters.PRESCRIPTIONS_RETURNED.increment();
+    }
     var payload = parseEGKPayload(Base64.getDecoder().decode(websocketMessage.payload()));
 
+    assert payload != null;
     var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
     Log.info("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
     Optional<WebsocketEntry> entry = store.findEntry(ctId);
