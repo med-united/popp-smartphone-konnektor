@@ -26,7 +26,6 @@ public class Subscriptions {
 
   @PostConstruct
   private void init() {
-
     Gauge.builder("uhp.subscriptions.count", this, Subscriptions::subscriptionCount)
         .description("Number of Subscriptions") // optional
         .tags("key", "value") // optional
