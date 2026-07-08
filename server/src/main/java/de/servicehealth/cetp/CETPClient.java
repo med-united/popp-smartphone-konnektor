@@ -49,7 +49,7 @@ public class CETPClient {
   public void onCardInfoTypeEvent(@Observes CardInserted cardInserted) {
     // Handle the CardInfoType event
     // For example, send it to an external system or log it
-    LOG.info("Received CardInfoType event: " + cardInserted);
+    LOG.fine("Received CardInfoType event: " + cardInserted);
 
     // You can access the Store if needed
     String tlsCertCN = cardInserted.getTlsCertCN();
@@ -64,7 +64,7 @@ public class CETPClient {
 
     // Further processing based on subscriptions
     for (var subscription : subscriptionOfCN) {
-      LOG.info("Processing subscription: " + subscription);
+      LOG.fine("Processing subscription: " + subscription);
       Event event = new Event();
       event.setTopic("CARD/INSERTED");
       event.setType(EventType.OPERATION);
@@ -98,7 +98,7 @@ public class CETPClient {
         URI uri = new URI(eventTo);
         String host = uri.getHost();
         int port = uri.getPort() != -1 ? uri.getPort() : 8444;
-        LOG.info("Sending event to " + host + ":" + port);
+        LOG.fine("Sending event to " + host + ":" + port);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         jaxbContext.createMarshaller().marshal(event, outputStream);
@@ -137,7 +137,7 @@ public class CETPClient {
           // Write eventBytes
           out.write(eventBytes);
           out.flush();
-          LOG.info("Sent eventBytes of length " + len + " to " + host + ":" + port);
+          LOG.fine("Sent eventBytes of length " + len + " to " + host + ":" + port);
         } catch (Exception e) {
           LOG.severe("Failed to send eventBytes: " + e.getMessage());
         }

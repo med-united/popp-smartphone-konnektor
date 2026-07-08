@@ -4,7 +4,6 @@ import de.gematik.ws.conn.cardservice.wsdl.v8_2.NewAPDUForSession;
 import de.gematik.ws.conn.observability.MetricsRegistry.Counters;
 import de.servicehealth.popp.session.Store;
 import de.servicehealth.popp.session.WebsocketEntry;
-import io.quarkus.logging.Log;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
@@ -177,7 +176,7 @@ public class Websocket {
 
     assert payload != null;
     var ctId = String.valueOf(payload.get("ctId")).replaceAll("\"", "");
-    Log.info("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
+    LOG.fine("Step eRezeptTokensFromAVS. Looking for card with id: " + ctId);
     Optional<WebsocketEntry> entry = store.findEntry(ctId);
     entry.ifPresent(websocketEntry -> websocketEntry.sendText(websocketMessage.message()));
   }

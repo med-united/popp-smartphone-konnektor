@@ -70,46 +70,8 @@ public class CardServicePortImpl implements CardServicePortType {
   public SecureSendAPDUResponse secureSendAPDU(SecureSendAPDU parameter) throws FaultMessage {
     LOG.log(Level.FINE, "Executing secureSendAPDU");
 
-    // Find TLS Cert CN from security context
-    String tlsCertCN = getTlsCertCN();
-
     String signedScenarioJwt = parameter.getSignedScenario();
 
-    /*
-    signedScenarioJwt contains a signed StandardScenarioMessage in JWT format.
-    The JWT consists of three parts: header, claims (payload), and signature.
-    The claims part contains the StandardScenarioMessage with details about the APDU commands to be executed.
-
-    "signedScenario": "eyAB.cdEF.ghIJ"
-
-    Where:
-
-    Sample content of the signed `StandardScenarioMessage` (header, claims, signature):
-          ```json
-          {
-            "typ": "JWT"
-            "alg": "ES256"
-            "x5c": ["MII..."]
-            "stpl": "MII..."
-          }
-          .
-          {
-            "message": {
-              "type": "StandardScenario",
-              "version": "1.0.0",
-              "clientSessionId": "123e4567-e89b-12d3-a456-426614174000",
-              "sequenceCounter": 1,
-              "timeSpan": 1000,
-              "steps": [
-                {
-                  "commandApdu": "00a4040c",
-                  "expectedStatusWords": ["9000", "6f00"]
-                }
-              ]
-            }
-          }
-    */
-    LOG.info(signedScenarioJwt);
     Jwt<?, ?> jwt =
         Jwts.parser()
             .keyLocator(
@@ -164,7 +126,7 @@ public class CardServicePortImpl implements CardServicePortType {
       String commandApduHex = (String) step.get("commandApdu");
       // Here you would send the APDU command to the card and get the response
       // For demonstration, we will just log the command
-      LOG.log(Level.FINE, "Processing APDU Command: " + commandApduHex);
+      LOG.fine("Processing APDU Command: " + commandApduHex);
       adpuPayloads.add(sendCardlinkWebsocketMessage(commandApduHex, sessionId));
     }
 
@@ -181,7 +143,7 @@ public class CardServicePortImpl implements CardServicePortType {
     try {
       websocketResponses =
           store.getAPDUResponses(backMappedCertCN, sessionId).get(10000, TimeUnit.MILLISECONDS);
-      LOG.info("Websocket Responses: ");
+      LOG.fine("Websocket Responses: ");
     } catch (InterruptedException | ExecutionException | TimeoutException e) {
       LOG.log(Level.SEVERE, "Error getting APDU response for session: " + sessionId, e);
       throw new FaultMessage("Error getting APDU response: " + e.getMessage());
@@ -197,7 +159,7 @@ public class CardServicePortImpl implements CardServicePortType {
           .add(websocketResponse);
     }
 
-    LOG.info("Collected all APDUs sending answer for session: " + sessionId);
+    LOG.fine("Collected all APDUs sending answer for session: " + sessionId);
 
     return response;
   }
@@ -229,7 +191,7 @@ public class CardServicePortImpl implements CardServicePortType {
 
   @Override
   public StartCardSessionResponse startCardSession(StartCardSession parameter) throws FaultMessage {
-    LOG.log(Level.INFO, "Executing startCardSession");
+    LOG.fine("Executing startCardSession");
     String sessionId = UUID.randomUUID().toString();
 
     // find TLS Cert CN from security context

@@ -52,6 +52,7 @@ public class WebsocketEntry {
       cardInfoType =
           createCardTypeFromx509AuthECC(registerEgkPayload.getString("cardSessionId"), x509AuthECC);
     } catch (Exception e) {
+      Log.debug("X509 Certificate Creation failed: " + e.getMessage());
       throw new RuntimeException("Can not generate x509AuthECC");
     }
     this.egkSession =
