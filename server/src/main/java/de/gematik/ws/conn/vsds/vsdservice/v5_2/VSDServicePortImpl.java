@@ -58,7 +58,7 @@ public class VSDServicePortImpl implements VSDServicePortType {
 
     JsonObject body =
         new JsonObject()
-            .put("communicationType", "contact-connector")
+            .put("communicationType", "contact-compat-connector")
             .put("cardId", certCN)
             .put("clientSessionId", parameter.getEhcHandle());
 
@@ -69,7 +69,7 @@ public class VSDServicePortImpl implements VSDServicePortType {
               .putHeader("Accept", "application/json")
               .sendJson(body)
               .await()
-              .atMost(Duration.ofSeconds(10));
+              .atMost(Duration.ofSeconds(15));
 
       int responseCode = response.statusCode();
 

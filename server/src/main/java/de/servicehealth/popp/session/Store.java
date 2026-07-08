@@ -21,7 +21,7 @@ public class Store {
 
   private final Map<String, List<WebsocketEntry>> tlsCertCNs2cards = new ConcurrentHashMap<>();
 
-   Event<CardInserted> cardInsertedEvent;
+  Event<CardInserted> cardInsertedEvent;
 
   public Store(Event<CardInserted> cardInsertedEvent) {
     this.cardInsertedEvent = cardInsertedEvent;
