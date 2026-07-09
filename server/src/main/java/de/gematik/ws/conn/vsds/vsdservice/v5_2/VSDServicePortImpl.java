@@ -61,7 +61,7 @@ public class VSDServicePortImpl implements VSDServicePortType {
   }
 
   @Override
-  public ReadVSDResponse readVSD(ReadVSD parameter) throws FaultMessage {
+  public ReadVSDResponse readVSD(ReadVSD parameter) {
     LOG.fine("Executing operation readVSD");
     ReadVSDResponse _return = new ReadVSDResponse();
 
