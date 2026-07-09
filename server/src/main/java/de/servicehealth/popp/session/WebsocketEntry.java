@@ -22,6 +22,7 @@ public class WebsocketEntry {
   private final String tlsCertCN;
   private final Session session;
   private EgkSession egkSession;
+  private boolean supportsExtendedApdus;
 
   public WebsocketEntry(String tlsCertCN, Session session) {
     this.tlsCertCN = tlsCertCN;
@@ -55,6 +56,9 @@ public class WebsocketEntry {
       Log.debug("X509 Certificate Creation failed: " + e.getMessage());
       throw new RuntimeException("Can not generate x509AuthECC");
     }
+
+    supportsExtendedApdus = registerEgkPayload.getBoolean("extendedApdus", true);
+
     this.egkSession =
         new EgkSession(cardSessionId, cardInfoType, x509AuthECC, new ApduScenario(), false);
   }
@@ -161,5 +165,9 @@ public class WebsocketEntry {
 
   public void clearApduScenario() {
     this.egkSession.apduScenario().clear();
+  }
+
+  public boolean isSupportsExtendedApdus() {
+    return supportsExtendedApdus;
   }
 }
