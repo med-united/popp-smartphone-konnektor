@@ -264,10 +264,12 @@ public class EventServicePortImpl implements EventServicePortType {
    * @see de.gematik.ws.conn.eventservice.wsdl.v7_2.EventServicePortType#getCards(de.gematik.ws.conn.eventservice.v7.GetCards parameter)*
    */
   public GetCardsResponse getCards(GetCards parameter) throws FaultMessage {
-    LOG.info("Executing operation getCards");
+    LOG.info("Executing operation getCards. param: " + parameter.getCardType());
     var cardTypeParameter = Optional.ofNullable(parameter.getCardType());
     String tlsCertCN = getTlsCertCN();
+    LOG.info("getting smcbs");
     CardInfoType smcbCardInfoType = getSmcb();
+    LOG.info("done getting smcbs");
     LOG.info("Authenticated user: " + identity.getPrincipal().getName());
 
     GetCardsResponse _return = new GetCardsResponse();
