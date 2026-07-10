@@ -13,6 +13,8 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
+import java.util.UUID;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -52,13 +54,30 @@ public class KonnektorProxyService {
 
   public Uni<Response> forward(
       String wsPath, String body, MultivaluedMap<String, String> requestHeaders) {
-    HttpRequest<Buffer> req = webClient.post("/ws/" + wsPath);
+    String requestId = UUID.randomUUID().toString();
+    String path = "/ws/" + wsPath;
+    long startNanos = System.nanoTime();
+
+    HttpRequest<Buffer> req = webClient.post(path);
     requestHeaders.forEach(
         (name, values) -> {
           if (!name.equalsIgnoreCase("host")) {
             values.forEach(v -> req.putHeader(name, v));
           }
         });
+
+    LOG.info(
+        "["
+            + requestId
+            + "] REQUEST START path="
+            + path
+            + " headers="
+            + requestHeaders
+            + " bodyLength="
+            + (body != null ? body.length() : 0)
+            + " body="
+            + body);
+
     return Uni.createFrom()
         .completionStage(
             req.sendBuffer(Buffer.buffer(body != null ? body : "")).toCompletionStage())
@@ -69,8 +88,43 @@ public class KonnektorProxyService {
               if (ct != null) {
                 rb.header("Content-Type", ct);
               }
-              LOG.fine("CODE: " + resp.statusCode() + " RESPONSE: " + resp.bodyAsString());
-              return rb.entity(resp.bodyAsString()).build();
+              String respBody = resp.bodyAsString();
+              long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+              LOG.info(
+                  "["
+                      + requestId
+                      + "] REQUEST COMPLETE path="
+                      + path
+                      + " status="
+                      + resp.statusCode()
+                      + " elapsedMs="
+                      + elapsedMs
+                      + " headers="
+                      + resp.headers()
+                      + " body="
+                      + respBody);
+
+              return rb.entity(respBody).build();
+            })
+        .onFailure()
+        .invoke(
+            throwable -> {
+              long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+              LOG.log(
+                  Level.WARNING,
+                  "["
+                      + requestId
+                      + "] REQUEST FAILED path="
+                      + path
+                      + " elapsedMs="
+                      + elapsedMs
+                      + " headers="
+                      + requestHeaders
+                      + " bodyLength="
+                      + (body != null ? body.length() : 0)
+                      + " error="
+                      + throwable,
+                  throwable);
             });
   }
 }
