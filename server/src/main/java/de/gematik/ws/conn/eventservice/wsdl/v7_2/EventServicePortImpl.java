@@ -264,11 +264,11 @@ public class EventServicePortImpl implements EventServicePortType {
    * @see de.gematik.ws.conn.eventservice.wsdl.v7_2.EventServicePortType#getCards(de.gematik.ws.conn.eventservice.v7.GetCards parameter)*
    */
   public GetCardsResponse getCards(GetCards parameter) throws FaultMessage {
-    LOG.fine("Executing operation getCards");
+    LOG.info("Executing operation getCards");
     var cardTypeParameter = Optional.ofNullable(parameter.getCardType());
     String tlsCertCN = getTlsCertCN();
     CardInfoType smcbCardInfoType = getSmcb();
-    LOG.fine("Authenticated user: " + identity.getPrincipal().getName());
+    LOG.info("Authenticated user: " + identity.getPrincipal().getName());
 
     GetCardsResponse _return = new GetCardsResponse();
     _return.setCards(new Cards());
@@ -283,6 +283,7 @@ public class EventServicePortImpl implements EventServicePortType {
     }
 
     if (cardTypeParameter.map(card -> card == CardTypeType.SMC_B).orElse(true)) {
+      LOG.info("Returning smcb: " + smcbCardInfoType.getIccsn());
       // In order to make ere ps app happy we need to tell it that an smcb actually exists
       _return.getCards().getCard().add(smcbCardInfoType);
     }
