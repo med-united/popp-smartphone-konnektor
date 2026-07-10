@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
+import java.util.logging.Logger;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -26,6 +27,8 @@ public class KonnektorProxyService {
   String connectorUrl;
 
   WebClient webClient;
+
+  private static final Logger LOG = Logger.getLogger(KonnektorProxyService.class.getName());
 
   @PostConstruct
   void init() {
@@ -66,6 +69,7 @@ public class KonnektorProxyService {
               if (ct != null) {
                 rb.header("Content-Type", ct);
               }
+              LOG.fine("CODE: " + resp.statusCode() + " RESPONSE: " + resp.bodyAsString());
               return rb.entity(resp.bodyAsString()).build();
             });
   }
