@@ -21,9 +21,11 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
+          distribution: 'corretto'
           java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -36,6 +38,6 @@ jobs:
 
       - name: Build and push
         run: |
-          mvn package -pl '!systemtests' -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
+          ./mvnw package -pl '!systemtests' -Dquarkus.container-image.group=uhp -Dquarkus.container-image.name=popp-smartphone-konnektor -Djavax.xml.accessExternalDTD=all -Djavax.xml.accessExternalSchema=all
           docker tag uhp/popp-smartphone-konnektor:latest 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
           docker push 765415433338.dkr.ecr.eu-central-1.amazonaws.com/uhp/popp-smartphone-konnektor:latest
