@@ -313,6 +313,7 @@ public class EventServicePortImpl implements EventServicePortType {
   private CardInfoType getSmcb() throws FaultMessage {
     String certCn = getTlsCertCN();
     if (Objects.isNull(certCn)) {
+      LOG.warning("Could not find certCN");
       throw new FaultMessage("Could not find certCn");
     }
 
